@@ -1,0 +1,67 @@
+# Department manifest — merged into {orchestration_dir}/capabilities.yaml.
+
+dept: cdo-docs
+label: Documentation Office
+backlog: docs             # backlogs/docs.md — the docs queue
+
+capabilities:
+
+  # detect the project's docs stack — framework, docs root, the file that
+  # controls visibility, and the commands that verify it. Writes
+  # docs-profile.yaml; produce and audit read it instead of re-probing.
+  detect:
+    entry: cdo-docs
+    consumes: project docs config + source tree
+    produces: docs-profile.yaml — framework, docs root, nav contract, verify commands
+
+  # raw ask → specced docs item. Target section and type decided up front so
+  # produce isn't guessing where the page lands or what shape it takes.
+  intake-shape:
+    entry: cdo-docs
+    consumes: raw ask or thin backlog line
+    produces: specced backlog item (doc type, target section, size, deps)
+
+  # shipped work is docs debt until documented — done/verified stories not yet
+  # represented in the backlog enqueue as unaligned candidates.
+  feed:
+    entry: cdo-docs
+    consumes: flow-ledger.yaml done/verified stories
+    produces: unaligned docs.md items (feed.py)
+
+  # the core contract: a doc isn't produced until it's reachable. Author the
+  # page, register it in whatever the profile says controls visibility
+  # (sidebar config, nav yaml, SUMMARY.md — or nothing, for filesystem-nav
+  # stacks), then run the stack's build as the visibility check.
+  produce:
+    entry: cdo-docs
+    consumes: confirmed docs item + docs profile
+    produces: doc artifact + nav/sidebar registration + build verification
+    delegates-when-installed:
+      - cdo-documentation      # project docs workflow — the owner pipeline
+      - bmad-agent-tech-writer # drafting delegate
+      - bmad-document-project  # brownfield project documentation
+      - bmad-index-docs        # folder index generation
+      - bmad-shard-doc         # splitting oversized docs
+      - cdo-distillator        # source compression for reference docs
+
+  # the retroactive half: existing pages the nav can't reach (the classic
+  # "folder exists, UI doesn't show it" gap) plus nav entries pointing at
+  # files that no longer exist.
+  audit:
+    entry: cdo-docs
+    consumes: docs tree vs nav contract (docs profile)
+    produces: orphan + broken-nav report, fix candidates (audit.py)
+
+  # office-hours — open-ended domain questions; advisory + read-only.
+  # No backlog/pipeline writes — journals to {orchestration_dir}/consult/.
+  consult:
+    entry: cdo-docs
+    consumes: open question or topic — no backlog item required
+    produces: advice + dated consult note in {orchestration_dir}/consult/docs.md
+    delegates-when-installed:
+      - cdo-documentation  # docs conventions
+      - cdo-distillator  # distillation
+      - bmad-agent-tech-writer  # writing
+      - bmad-document-project  # project docs
+      - bmad-index-docs  # indexing
+      - bmad-shard-doc  # sharding

@@ -1,0 +1,79 @@
+# Department manifest — merged into {orchestration_dir}/capabilities.yaml by
+# cdo-product-setup. The CDO reads capabilities.yaml to discover what each
+# installed department can do to which backlog.
+
+dept: cdo-product
+label: Product & Design Office
+backlog: product          # backlogs/product.md — seeded on install
+
+capabilities:
+
+  # intake → specced backlog item. Turns a spoken/rough ask into something
+  # alignment can draft against. Wondel frameworks sharpen the shaping:
+  # mom-test keeps asks honest, JTBD frames value, continuous-discovery is
+  # the intake cadence.
+  intake-shape:
+    entry: cdo-product
+    consumes: raw ask or thin backlog line
+    produces: specced backlog item (problem, value, AC sketch, sizing, deps)
+    delegates-when-installed:
+      - wdl-mom-test               # is this a real pain or a lie-friendly ask
+      - wdl-jobs-to-be-done        # value framing
+      - wdl-continuous-discovery   # intake cadence
+      - wdl-inspired-product       # product-vs-project discipline
+      - wdl-lean-startup           # riskiest-assumption framing
+      - wdl-hundred-million-offers # offer construction
+      - wdl-crossing-the-chasm     # segment targeting
+
+  # co-signer duty — P&D reviews alignment drafts before the Operator sees them.
+  # The second signature every card needs.
+  co-sign:
+    entry: cdo-product
+    consumes: alignment card (draft file)
+    produces: verdict {sign | revise | reject} + notes
+    delegates-when-installed:
+      - wdl-mom-test            # would this card survive an honest customer
+      - wdl-jobs-to-be-done     # ACs test the intent?
+      - wdl-obviously-awesome   # positioning legible?
+
+  # spec production for confirmed items needing full artifacts.
+  # `produce` is the dispatch-target name cdo-batch routes on — it must exist.
+  produce:
+    entry: cdo-product
+    consumes: confirmed alignment card
+    produces: PRD / UX spec / story spec artifact
+    delegates-when-installed:
+      - bmad-prd
+      - bmad-ux
+      - bmad-create-story
+      # wondelai journeys + frameworks — spec method sources
+      - wdl-create-app            # app-shaped items → full guided journey
+      - wdl-create-business       # business-shaped items
+      - wdl-create-website        # site-shaped items
+      - wdl-inspired-product      # PRD structure
+      - wdl-design-sprint         # uncertainty-heavy items
+      - wdl-lean-ux               # hypothesis-first specs
+      - wdl-blue-ocean-strategy   # strategy framing
+      - wdl-good-strategy-bad-strategy
+      - wdl-monetizing-innovation # pricing/offer specs
+
+  # office-hours — open-ended domain questions; advisory + read-only.
+  # No backlog/pipeline writes — journals to {orchestration_dir}/consult/.
+  consult:
+    entry: cdo-product
+    consumes: open question or topic — no backlog item required
+    produces: advice + dated consult note in {orchestration_dir}/consult/product.md
+    delegates-when-installed:
+      - wdl-mom-test  # honest-signal interviewing
+      - wdl-jobs-to-be-done  # demand framing
+      - wdl-continuous-discovery  # discovery cadence
+      - wdl-inspired-product  # product practice
+      - wdl-lean-startup  # validated learning
+      - wdl-hundred-million-offers  # offer design
+      - wdl-crossing-the-chasm  # adoption strategy
+      - wdl-obviously-awesome  # delight criteria
+      - wdl-design-sprint  # rapid validation
+      - wdl-lean-ux  # hypothesis specs
+      - wdl-blue-ocean-strategy  # strategy framing
+      - wdl-good-strategy-bad-strategy  # strategy quality
+      - wdl-monetizing-innovation  # pricing/offer

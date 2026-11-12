@@ -1,0 +1,65 @@
+# Department manifest — merged into {orchestration_dir}/capabilities.yaml.
+
+dept: cdo-academy
+label: Learning & Capability
+backlog: curriculum       # backlogs/curriculum.md — the education queue
+
+capabilities:
+
+  # dissect a shipped story into its full knowledge chain — what would a
+  # zero-IT person need to learn to produce this output? concepts carry
+  # level bands and requires-edges walked back to the literacy floor.
+  extract:
+    entry: cdo-academy
+    consumes: verified/done story + its deliverables
+    produces: learning/knowledge/{key}.yaml — concept graph (level + requires + evidence)
+
+  # judge curriculum coverage: does academy/catalog.yaml teach every concept
+  # (and its prerequisite rungs) at the level the work demanded? LLM
+  # coverage pass — confirmed gaps are filed to the backlog via catalog.py.
+  gap-check:
+    entry: cdo-academy
+    consumes: learning/knowledge/*.yaml vs docs/academy/catalog.yaml
+    produces: gap concepts → curriculum backlog items (catalog.py file-gap)
+    delegates-when-installed:
+      - wdl-clean-code            # concept 'clean-code' → canonical source
+      - wdl-domain-driven-design
+      - wdl-system-design
+      - wdl-lean-startup
+      - wdl-jobs-to-be-done
+      - wdl-lean-analytics
+      - wdl-working-with-legacy-code
+      - wdl-release-it
+      - wdl-team-topologies
+      - wdl-continuous-discovery
+
+  # author one module for a confirmed curriculum item — incremental:
+  # docs/academy/{track}/{course}/NN-{concept}.md + index upkeep + catalog
+  # registration. Courses grow module by module as real work demands them.
+  produce:
+    entry: cdo-academy
+    consumes: confirmed curriculum item
+    produces: docs/academy/{track}/{course}/ module + catalog entry
+    delegates-when-installed:
+      - wdl-drive-motivation      # engagement/pedagogy framing
+      # every wdl-* framework is potential source material when its
+      # topic matches the item — probe at invocation, not just install
+
+  # office-hours — open-ended domain questions; advisory + read-only.
+  # No backlog/pipeline writes — journals to {orchestration_dir}/consult/.
+  consult:
+    entry: cdo-academy
+    consumes: open question or topic — no backlog item required
+    produces: advice + dated consult note in {orchestration_dir}/consult/academy.md
+    delegates-when-installed:
+      - wdl-clean-code
+      - wdl-domain-driven-design
+      - wdl-system-design
+      - wdl-lean-startup
+      - wdl-jobs-to-be-done
+      - wdl-lean-analytics
+      - wdl-working-with-legacy-code
+      - wdl-release-it
+      - wdl-team-topologies
+      - wdl-continuous-discovery
+      - wdl-drive-motivation  # engagement/pedagogy

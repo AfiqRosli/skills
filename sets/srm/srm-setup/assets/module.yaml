@@ -1,0 +1,18 @@
+code: srm
+name: "Skills Repo Manager"
+description: "Maps external skill repositories into the project as prefixed, BMad-structured skills. Syncs sources via git pull (never modifies sources), adapts foreign layouts — flat skill dirs, Claude plugin dirs, BMad source modules — into BMad conventions, and prunes stale mappings."
+module_version: 1.0.0
+default_selected: false
+module_greeting: >
+  Skills Repo Manager installed — external skill repos can now be mapped into this
+  project. Run the srm-sync skill with 'list' to see registered sources, 'sync'
+  to pull and materialize skills, or 'add <repo-path>' to register a new repo —
+  you will be asked what prefix to prepend. Sources are never modified;
+  at most, a git pull refreshes them.
+
+skills_repo_root:
+  prompt: "Where is the root folder containing your external skill repos? (required — no default)"
+
+git_pull:
+  prompt: "Should sync run 'git pull --ff-only' on each registered repo before mapping? (yes/no)"
+  default: "yes"

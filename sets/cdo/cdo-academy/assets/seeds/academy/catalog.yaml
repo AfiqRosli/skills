@@ -1,0 +1,5 @@
+# Academy catalog — the coverage map.
+# tracks -> courses -> modules. The gap-check reasons over this file:
+# a concept the org needed that no module covers (at the required level)
+# becomes a curriculum backlog item.
+tracks: {}

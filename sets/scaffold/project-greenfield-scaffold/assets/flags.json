@@ -1,0 +1,40 @@
+{
+  "$schema_note": "Module flags consumed by scaffold.py. Modules default ON; --skip <module> turns one off; --minimal expands to its listed skips. requires = a disabled module force-disables its dependents (cascade OFF, reported). excluded_paths are removed from the rendered tree; stripped deps/scripts/scripts-blocks come from versions.json + // @flag markers.",
+  "modules": {
+    "core":   { "description": "Nuxt + Vuetify + Pinia + Elysia + TS + SCSS/BEM + ESLint", "always": true },
+    "rules":  { "description": ".devin/rules code-style-guide set" },
+    "tests":  { "description": "Vitest + Playwright + test scripts" },
+    "db":     { "description": "Drizzle ORM + Neon Postgres" },
+    "auth":   { "description": "better-auth + auth schema/client/middleware", "requires": ["db"] },
+    "billing":{ "description": "Polar checkout/portal/webhooks via @polar-sh/better-auth", "requires": ["auth"] },
+    "email":  { "description": "Resend transactional email lib + router" },
+    "redis":  { "description": "ioredis client helper" },
+    "sentry": { "description": "@sentry/nuxt module + config" },
+    "seo":    { "description": "robots + sitemap + seo-utils + og-image" },
+    "docs":   { "description": "VitePress docs site" },
+    "deploy": { "description": "Netlify preset + netlify.toml + cache/lighthouse plugins" }
+  },
+  "expansions": {
+    "minimal": ["auth", "billing", "db", "email", "redis", "sentry", "seo", "docs", "deploy"]
+  },
+  "excluded_paths": {
+    "rules":  [".devin"],
+    "tests":  ["vitest.config.ts", "playwright.config.ts", "tests"],
+    "db":     ["drizzle.config.ts", "drizzle", "server/db"],
+    "auth":   ["auth.ts", "auth-schema.ts", "lib/auth-client.ts", "middleware/auth.global.ts", "pages/sign-in.vue", "pages/register.vue", "server/auth.ts", "stores/AuthStore.ts"],
+    "billing":["server/lib/polar-webhook.ts", "stores/BillingStore.ts"],
+    "email":  ["server/lib/email.ts", "server/email.ts"],
+    "redis":  ["server/lib/redis.ts"],
+    "sentry": ["sentry.client.config.ts", "sentry.server.config.ts"],
+    "seo":    [],
+    "docs":   ["docs"],
+    "deploy": ["netlify.toml"]
+  },
+  "excluded_scripts": {
+    "tests":  ["test", "test:ui", "test:run", "test:coverage", "test:e2e", "test:e2e:ui", "test:e2e:headed"],
+    "db":     ["db:generate", "db:push", "db:migrate", "db:studio"],
+    "docs":   ["docs:dev", "docs:build", "docs:preview"],
+    "billing": [],
+    "deploy": []
+  }
+}

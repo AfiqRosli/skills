@@ -1,0 +1,9 @@
+// Global styles — loaded via nuxt.config.ts `css`. Component-scoped
+// styles belong in SFC <style> blocks with BEM naming; this file is for
+// truly global concerns (resets beyond Vuetify's, html/body, focus
+// outlines, cross-cutting utility overrides).
+
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

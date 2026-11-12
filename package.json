@@ -1,0 +1,14 @@
+{
+  "name": "skills",
+  "version": "0.1.0",
+  "private": true,
+  "description": "House skill modules — installable sets (cdo, srm, scaffold) that drop into .agents/skills of any project.",
+  "bin": {
+    "cdo": "bin/cdo.js",
+    "srm": "bin/srm.js",
+    "scaffold": "bin/scaffold.js"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

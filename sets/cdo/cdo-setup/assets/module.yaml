@@ -1,0 +1,68 @@
+code: cdo
+name: Autonomous Delivery Org
+description: "24/7 autonomous delivery orchestration — Operator-gated alignment, headless batch dispatch through cdo-code-e2e, ops-floor monitoring, and journaled decision memory. Department modules (cdo-*) install separately."
+module_version: 0.1.0
+default_selected: false
+module_greeting: >
+  Autonomous Delivery Org installed — orchestration tree scaffolded under
+  docs/orchestration/, config written, department modules registered.
+  Requires an official BMAD install and git. Talk to cdo-orchestrator to run
+  the operation; re-run /cdo-setup to upgrade or repair.
+
+orchestration_dir:
+  prompt: "Where should orchestration artifacts (checklists, doctrine, ledgers) live?"
+  default: "docs/orchestration"
+  result: "{project-root}/{value}"
+
+sprint_status_path:
+  prompt: "Sprint status yaml path?"
+  default: "{project-root}/_bmad-output/implementation-artifacts/sprint-status.yaml"
+
+story_location:
+  prompt: "Where do story docs live?"
+  default: "{project-root}/_bmad-output/implementation-artifacts/stories"
+
+devlog_dir:
+  prompt: "Dev log root directory?"
+  default: "{project-root}/docs/orchestration/devlog"
+  result: "{project-root}/{value}"
+
+package_manager:
+  prompt: "Package manager (bun/npm/pnpm/yarn)?"
+  default: "auto-detected"
+
+health_commands:
+  prompt: "Health-check commands (test/build/lint) as a comma list?"
+  default: "auto-detected from package.json"
+
+earned_autonomy:
+  prompt: "Allow self-certification after 10 consecutive Operator confirmations >=95% confidence? (on/off)"
+  default: "off"
+
+alignment_buffer_min:
+  prompt: "Warn when the confirmed pool drops below how many stories?"
+  default: "2"
+
+stall_timeout_minutes:
+  prompt: "Watchdog heartbeat — flag a step stalled after how many minutes?"
+  default: "45"
+
+batch_budget:
+  prompt: "Batch cost ceiling (currency or token cap)? Leave unset for no limit."
+  default: ""
+
+ship_target:
+  prompt: "Which deploy lane may automation target? (preview only — production stays Operator-gated)"
+  default: "preview"
+
+dispatch_mode:
+  prompt: "Auto-dispatch stories the moment Operator alignment confirms them? (auto = confirmation IS the dispatch order, workers spawn as separate devin sessions; manual = pool waits for explicit dispatch)"
+  default: "auto"
+
+dispatch_target:
+  prompt: "Where do dispatch worker sessions run? (local = `devin acp` sessions on this machine — visible in the IDE session list, auth via DEVIN_API_KEY env; cloud = Devin Cloud fresh VMs in the web app, pool state pushes to the ship lane first)"
+  default: "local"
+
+dispatch_permission_mode:
+  prompt: "Session mode for spawned local dispatch workers — ACP set_mode, they run unattended and cannot answer prompts (bypass/accept-edits/ask/plan; ignored when dispatch_target is cloud)"
+  default: "bypass"

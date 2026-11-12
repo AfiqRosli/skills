@@ -51,14 +51,6 @@ cdo --dry-run           # preview without writing
 - `srm` → invoke `srm-setup`, then `srm-sync`
 - `scaffold` → invoke `project-greenfield-scaffold`
 
-## Private repo variant
-
-If the repo is private, use the SSH form (requires your SSH keys):
-
-```bash
-bunx -p git+ssh://git@github.com/AfiqRosli/skills.git cdo
-```
-
 ## Authoring & releasing
 
 Edit skills under `sets/<set>/<skill>/`. To add a new set, create `sets/<name>/`, add a `bin/<name>.js` wrapper calling `lib/install.js#run('<name>')`, and register the bin in `package.json`.

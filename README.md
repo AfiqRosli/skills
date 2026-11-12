@@ -2,6 +2,8 @@
 
 House skill modules, installable into any project's `.agents/skills` via the exec runner of your choice. Each set is an independent bin — install only what you need.
 
+**This repo is the authoring source of truth.** Skills are edited directly under `sets/`; consuming projects (including `prto`) install managed copies and should never edit `.agents/skills/<managed>` locally — those changes are overwritten on the next install.
+
 ## Sets
 
 | Bin        | Skills                                                        | Purpose                                        |
@@ -57,14 +59,15 @@ If the repo is private, use the SSH form (requires your SSH keys):
 bunx -p git+ssh://git@github.com/AfiqRosli/skills.git cdo
 ```
 
-## Releasing
+## Authoring & releasing
 
-Skills are authored in the source repo (`prto` at `.agents/skills/`). Re-stage and release:
+Edit skills under `sets/<set>/<skill>/`. To add a new set, create `sets/<name>/`, add a `bin/<name>.js` wrapper calling `lib/install.js#run('<name>')`, and register the bin in `package.json`.
+
+Cut a release:
 
 ```bash
-node tools/stage.mjs --from C:\Core\Businesses\PRTO\prto
-# bump version in package.json
-git add -A && git commit -m "release: <notes>"
-git tag v0.2.0
-git push --tags origin main
+node tools/release.mjs patch "what changed"   # or minor | major
+git push --follow-tags origin main
 ```
+
+Consumers then pull the new version with `bunx -p github:AfiqRosli/skills#vX.Y.Z <set>` — or unpinned, accepting the runner's cache window.

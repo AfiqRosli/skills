@@ -1,0 +1,70 @@
+# Department manifest — merged into {orchestration_dir}/capabilities.yaml by
+# cdo-eng setup.
+
+dept: cdo-eng
+label: Software Engineering
+backlog: code             # backlogs/code.md — the engineering queue
+
+capabilities:
+
+  # shape raw code asks into specced code.md items
+  intake-shape:
+    entry: cdo-eng
+    consumes: raw ask or thin backlog line
+    produces: specced backlog item (approach sketch, touched surfaces, deps)
+    delegates-when-installed:
+      - wdl-domain-driven-design      # bounded-context framing for approach/touches
+      - wdl-design-code-architecture  # architecture-angle shaping
+
+  # THE dispatch target — confirmed code card → story spec → cdo-code-e2e.
+  # cdo-batch invokes this capability for `code` backlog items. The wdl
+  # engineering frameworks are the method sources the pipeline draws on.
+  produce:
+    entry: cdo-eng
+    consumes: confirmed alignment card
+    produces: cdo-code-e2e pipeline result (implemented story)
+    delegates-when-installed:
+      - cdo-code-e2e            # the per-story pipeline — produce IS this delegation
+      - bmad-create-story   # story-file conventions — enriches the shape-story-seeded skeleton
+      - bmad-dev-story      # dev-story execution
+      - bmad-code-review    # adversarial review pass
+      # wondelai engineering method sources — the card's technical bar
+      - wdl-clean-code                  # naming/structure standards
+      - wdl-clean-architecture          # dependency boundaries
+      - wdl-domain-driven-design        # model integrity
+      - wdl-pragmatic-programmer        # orthogonality, tracer bullets
+      - wdl-system-design               # systems-level items
+      - wdl-ddia-systems                # data-intensive items
+      - wdl-software-design-philosophy  # complexity discipline
+      - wdl-design-code-architecture    # architecture-first items
+      - wdl-37signals-way               # build-honest-software cadence
+
+  # fix-up work on blocked/quarantined code items — bounded repair, not redispatch
+  repair:
+    entry: cdo-eng
+    consumes: quarantined/blocked story + its failure reason
+    produces: minimal fix patch or a precise "needs X" escalation
+    delegates-when-installed:
+      - wdl-working-with-legacy-code  # safe change in tangled code
+      - wdl-remove-technical-debt     # debt-shaped failures
+      - wdl-refactoring-patterns      # minimal-diff techniques
+
+  # office-hours — open-ended domain questions; advisory + read-only.
+  # No backlog/pipeline writes — journals to {orchestration_dir}/consult/.
+  consult:
+    entry: cdo-eng
+    consumes: open question or topic — no backlog item required
+    produces: advice + dated consult note in {orchestration_dir}/consult/eng.md
+    delegates-when-installed:
+      - wdl-domain-driven-design
+      - wdl-design-code-architecture
+      - wdl-clean-code
+      - wdl-clean-architecture
+      - wdl-pragmatic-programmer
+      - wdl-system-design
+      - wdl-ddia-systems
+      - wdl-software-design-philosophy
+      - wdl-37signals-way
+      - wdl-working-with-legacy-code
+      - wdl-remove-technical-debt
+      - wdl-refactoring-patterns

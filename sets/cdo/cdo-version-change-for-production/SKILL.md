@@ -239,7 +239,7 @@ Update the Release Train version file with the new product version:
 - **Set `sprint` on every new entry** — the sprint that owns the deployed work. Resolve it from the newest sprint file in `_bmad-output/implementation-artifacts/`: only files matching `sprint-status-<Channel>-YYYY.MM.DD[.N].yaml` count (skip non-dated files like `sprint-status-archive.yaml`); sort by the embedded `YYYY.MM.DD[.N]` descending. The winner's stem minus the `sprint-status-` prefix is the sprint ID (e.g. `Beta-2026.10.04.2`). If no dated sprint-status file exists, omit `sprint`.
 - A sprint ID is version-*shaped* but is a label, not a release. It may differ from every version in `release-train.json` — that's expected: the `sprint` field is what records the association.
 
-**Sprint boundary ≠ deploy boundary:** a version bump tags a deploy. It must NEVER create, rename, or migrate sprint artifacts (`sprint-status-*.yaml`, `epics-beta-*.md`, `implementation-artifacts/<version>/` spec folders, devlog dirs). Sprint transitions are a separate, user-initiated decision handled by `project-version-upgrade` — mid-sprint deploys leave all sprint files untouched.
+**Sprint boundary ≠ deploy boundary:** a version bump tags a deploy. It must NEVER create, rename, or migrate sprint artifacts (`sprint-status-*.yaml`, `epics-beta-*.md`, `implementation-artifacts/<version>/` spec folders, devlog dirs). Sprint transitions are a separate, user-initiated decision handled by `cdo-version-upgrade` — mid-sprint deploys leave all sprint files untouched.
 
 ### 4c. Update `nuxt.config.ts` Runtime Config
 
@@ -457,7 +457,7 @@ If changes include both breaking and non-breaking modifications:
 Deploying a batch of stories that belong to an in-flight sprint is the normal case, not an edge case:
 - Tag with the real deploy date (and `.N` / signal suffix as usual) — never freeze or suffix the version to preserve the sprint association (no `v2026.07.24-x` patterns)
 - Set `sprint` on the release-train entry to the active sprint ID
-- Do NOT run `project-version-upgrade` — sprint files stay exactly as they are
+- Do NOT run `cdo-version-upgrade` — sprint files stay exactly as they are
 - The sprint file only changes when the user explicitly starts a new sprint
 
 ### Same-Day Multiple Releases

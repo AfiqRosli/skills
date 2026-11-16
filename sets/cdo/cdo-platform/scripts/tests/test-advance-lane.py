@@ -112,10 +112,11 @@ class TestAdvanceLane(unittest.TestCase):
         self.assertEqual((root / "code.ts").read_text().strip(),
                          "local wip")
 
-    def test_reconcile_checkpoints_code_wip_then_conflicts(self):
-        """Ad-hoc WIP outside state roots gets checkpointed instead of
-        refused; only the real merge conflict (add/add) still refuses —
-        with the WIP preserved in the checkpoint commit."""
+    def test_reconcile_stashes_code_wip_pop_conflicts(self):
+        """Ad-hoc WIP stashes aside instead of checkpointing — the merge
+        lands (the lane no longer conflicts with an absent file), then
+        the pop conflicts on the same-path shipped file: stash kept,
+        conflict reported, nothing committed."""
         root = make_repo(self.tmp)
         # lane adds a top-level file the local tree also dirtied
         git(root, "checkout", "-qb", "ship2", "cdo-lane")
@@ -128,21 +129,21 @@ class TestAdvanceLane(unittest.TestCase):
         (root / "hotfix.ts").write_text("local conflicting\n")
         proc, res = run_al(root, "--to", "refs/heads/cdo-lane",
                            "--reconcile")
-        self.assertEqual(res["status"], "refused")
-        self.assertIn("hotfix.ts", res.get("blocking", []))
-        # the WIP was committed into the checkpoint before the merge
-        # aborted — nothing lost, a human reconciles the conflict
-        self.assertTrue(res.get("checkpoint"))
-        self.assertIn("hotfix.ts", res.get("adhoc_checkpointed", []))
+        self.assertEqual(res["status"], "reconciled")
+        self.assertEqual(res["adhoc_stashed"], ["hotfix.ts"])
+        self.assertEqual(res["stash_pop"]["status"], "conflicts")
+        # the shipped version is in the tree; the WIP survives in the
+        # stash — never dropped, never committed onto the lane
         self.assertEqual(
-            (root / "hotfix.ts").read_text().strip(),
-            "local conflicting")
-        self.assertIn("cdo state: checkpoint",
-                      git(root, "log", "-1", "--format=%s").stdout)
+            (root / "hotfix.ts").read_text().strip(), "shipped")
+        self.assertIn("cdo reconcile: ad-hoc WIP aside",
+                      git(root, "stash", "list").stdout)
+        self.assertNotIn("local conflicting",
+                         git(root, "log", "-3", "--format=%B").stdout)
 
-    def test_reconcile_checkpoints_adhoc_wip_and_merges(self):
+    def test_reconcile_stashes_adhoc_wip_and_merges(self):
         """Dirty ad-hoc file overlapping the incoming diff in a
-        disjoint region → checkpointed, then merges clean."""
+        disjoint region → stashed, merged, popped back uncommitted."""
         root = make_repo(self.tmp)
         (root / "code.ts").write_text("l1\nl2\nl3\n")
         git(root, "add", ".")
@@ -159,10 +160,48 @@ class TestAdvanceLane(unittest.TestCase):
         proc, res = run_al(root, "--to", "refs/heads/cdo-lane",
                            "--reconcile")
         self.assertEqual(res["status"], "reconciled")
-        self.assertEqual(res["adhoc_checkpointed"], ["code.ts"])
+        self.assertEqual(res["adhoc_stashed"], ["code.ts"])
+        self.assertEqual(res["stash_pop"]["status"], "restored")
         self.assertEqual((root / "code.ts").read_text(),
                          "L1-shipped\nl2\nl3-local-wip\n")
         self.assertTrue(res["ref_advanced"])
+        # pop dropped the stash — nothing lingers, nothing committed
+        self.assertNotIn("cdo reconcile: ad-hoc WIP aside",
+                         git(root, "stash", "list").stdout)
+        self.assertIn(" M code.ts",
+                      git(root, "status", "--porcelain").stdout)
+
+    def test_reconcile_state_checkpoints_adhoc_stashes(self):
+        """Mixed dirty: org-state churn still checkpoints (resolved
+        --ours) while ad-hoc WIP rides the stash in and out."""
+        root = make_repo(self.tmp)
+        # lane edits a state-root file the local tree also dirtied
+        git(root, "checkout", "-qb", "ship2", "cdo-lane")
+        (root / "docs/orchestration/ledger.yaml").write_text("v2-lane\n")
+        git(root, "add", ".")
+        git(root, "-c", "user.email=t@t", "-c", "user.name=t",
+            "commit", "-qm", "ship2")
+        git(root, "update-ref", "refs/heads/cdo-lane", "HEAD")
+        git(root, "checkout", "-q", "preview")
+        (root / "docs/orchestration/ledger.yaml").write_text("v2-local\n")
+        (root / "code.ts").write_text("wip\n")   # untracked ad-hoc
+        _, res = run_al(root, "--to", "refs/heads/cdo-lane",
+                        "--reconcile")
+        self.assertEqual(res["status"], "reconciled")
+        self.assertTrue(res["checkpoint"])
+        self.assertEqual(res["conflicts_ours"],
+                         ["docs/orchestration/ledger.yaml"])
+        self.assertEqual(res["adhoc_stashed"], ["code.ts"])
+        self.assertEqual(res["stash_pop"]["status"], "restored")
+        # live state won; the WIP is back as an untracked file —
+        # never swept into the checkpoint commit
+        self.assertEqual(
+            (root / "docs/orchestration/ledger.yaml").read_text(),
+            "v2-local\n")
+        self.assertIn("?? code.ts",
+                      git(root, "status", "--porcelain").stdout)
+        self.assertNotIn("code.ts",
+                         git(root, "ls-files").stdout)
 
     def test_reconcile_recovers_from_diverged_lane(self):
         """Crash-resume: lane holds a checkpoint commit the target lacks —

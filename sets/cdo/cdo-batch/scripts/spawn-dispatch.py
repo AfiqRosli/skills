@@ -300,8 +300,22 @@ def env_value(env_file: str, key: str):
 
 
 def user_name(root: Path) -> str:
-    """Operator identity — _bmad/config.user.yaml `user_name`, then the
-    shared config's root key, else a bare 'Operator'."""
+    """Operator identity — TOML core.user_name via the installer's resolver
+    (canonical on BMAD v6.12+), then _bmad/config.user.yaml `user_name`,
+    then the shared config's root key, else a bare 'Operator'."""
+    script = root / "_bmad" / "scripts" / "resolve_config.py"
+    if script.is_file():
+        try:
+            proc = subprocess.run(
+                ["uv", "run", str(script), "--project-root", str(root),
+                 "--key", "core.user_name"],
+                capture_output=True, text=True, timeout=60)
+            if proc.returncode == 0:
+                name = json.loads(proc.stdout).get("core.user_name", "")
+                if isinstance(name, str) and name.strip():
+                    return name.strip()
+        except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+            pass
     for cfg in (root / "_bmad" / "config.user.yaml",
                 root / "_bmad" / "config.yaml"):
         if cfg.is_file():

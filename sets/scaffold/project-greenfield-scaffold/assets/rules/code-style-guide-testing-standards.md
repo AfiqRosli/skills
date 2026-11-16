@@ -1,7 +1,3 @@
----
-trigger: always_on
----
-
 # Testing Standards
 
 ## Overview

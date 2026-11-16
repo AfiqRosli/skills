@@ -1,0 +1,84 @@
+{
+  "scanner": "path-standards",
+  "script": "scan-path-standards.py",
+  "version": "3.0.0",
+  "skill_path": "sets\\srm\\srm-sync",
+  "timestamp": "2026-11-16T13:56:10.575496+00:00",
+  "files_scanned": [
+    ".analysis\\2026-11-16-2156\\prepass-integrity-setup.json",
+    ".analysis\\2026-11-16-2156\\prepass-integrity-sync.json",
+    ".analysis\\2026-11-16-2156\\prepass-metrics-setup.json",
+    ".analysis\\2026-11-16-2156\\prepass-metrics-sync.json",
+    ".analysis\\2026-11-16-2156\\prepass-paths-sync.json",
+    "references\\adaptation.md",
+    "SKILL.md"
+  ],
+  "status": "fail",
+  "findings": [
+    {
+      "file": "references\\adaptation.md",
+      "line": 48,
+      "severity": "high",
+      "category": "relative-prefix",
+      "title": "Parent directory reference (../) found \u2014 fragile, breaks with reorganization",
+      "detail": "(`../<router>/workflows/`, `tasks/`, `templates/`)",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 23,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "Script: `./scripts/sync.py` (run with `python`). Common flags: `--config-root {project-root}`, `--registry {project-root",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 23,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "Script: `./scripts/sync.py` (run with `python`). Common flags: `--config-root {project-root}`, `--registry {project-root",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 62,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "1. Run `python ./scripts/sync.py detect --path \"<repo-path>\"` \u2014 prints suggested layout, candidate skills paths, grouped",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 108,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "Full adaptation details: `./references/adaptation.md`.",
+      "action": ""
+    }
+  ],
+  "assessments": {},
+  "summary": {
+    "total_findings": 5,
+    "by_severity": {
+      "critical": 0,
+      "high": 5,
+      "medium": 0,
+      "low": 0
+    },
+    "by_category": {
+      "double_prefix": 0,
+      "bare_bmad": 0,
+      "absolute_path": 0,
+      "relative_prefix": 1,
+      "cross_dir_dot_slash": 4,
+      "frontmatter": 0,
+      "structure": 0
+    },
+    "assessment": "Path standards scan complete"
+  }
+}

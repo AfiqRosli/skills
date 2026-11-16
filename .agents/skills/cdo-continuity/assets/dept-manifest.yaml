@@ -1,0 +1,58 @@
+# Department manifest — merged into {orchestration_dir}/capabilities.yaml.
+
+dept: cdo-continuity
+label: Continuity & Recovery Office
+backlog: continuity       # backlogs/continuity.md
+
+capabilities:
+
+  # reconstruct what actually happened — ledger + signals + doctrine →
+  # a case file. Post-mortems are assembled, not remembered.
+  forensic:
+    entry: cdo-continuity
+    consumes: story/incident key
+    produces: learning/cases/{key}.md + findings → doctrine
+    delegates-when-installed:
+      - bmad-bus-cybersec-team-forensic-investigator   # evidence analysis
+
+  # restore operations after a crash — reconcile ledger vs files vs git,
+  # repair orphaned state, re-seat locks, rebuild the ops picture.
+  # release-it's failure-pattern catalog is the method source.
+  recover:
+    entry: cdo-continuity
+    consumes: live state (ledger/checklist/backlogs/git)
+    produces: integrity report + applied repairs journaled to handover
+    delegates-when-installed:
+      - wdl-release-it               # stability patterns / failure modes
+      - wdl-working-with-legacy-code # safe repair in tangled state
+
+  # serious incident — delegate wholesale to the cybersec IR family
+  incident:
+    entry: cdo-continuity
+    consumes: incident declaration + affected surface
+    produces: coordinated response via IR delegates
+    delegates-when-installed:
+      - bmad-bus-cybersec-team-incident-commander
+      - bmad-bus-cybersec-team-incident-response-playbook
+      - bmad-bus-cybersec-team-blue-team-lead
+
+  # Dispatch target — a confirmed continuity item (runbook to write, recovery
+  # drill to run, hardening task) is work to execute.
+  produce:
+    entry: cdo-continuity
+    consumes: confirmed continuity item card
+    produces: executed resilience work + outcome journaled to ledger
+
+  # office-hours — open-ended domain questions; advisory + read-only.
+  # No backlog/pipeline writes — journals to {orchestration_dir}/consult/.
+  consult:
+    entry: cdo-continuity
+    consumes: open question or topic — no backlog item required
+    produces: advice + dated consult note in {orchestration_dir}/consult/continuity.md
+    delegates-when-installed:
+      - bmad-bus-cybersec-team-forensic-investigator
+      - bmad-bus-cybersec-team-incident-commander
+      - bmad-bus-cybersec-team-incident-response-playbook
+      - bmad-bus-cybersec-team-blue-team-lead
+      - wdl-release-it  # rollback/recovery
+      - wdl-working-with-legacy-code  # tangled-state repair

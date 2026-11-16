@@ -1,0 +1,32 @@
+[build]
+  command = "bun run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "24"
+  NODE_OPTIONS = "--max-old-space-size=4096"
+
+# Persist Vite/Nuxt build cache and node_modules across builds so SASS
+# compilation and dependency resolution aren't redone every time.
+[[plugins]]
+  package = "netlify-plugin-cache"
+
+  [plugins.inputs]
+    paths = [
+      "node_modules/.cache",
+      ".nuxt/cache",
+      ".nuxt/manifest",
+    ]
+
+# Lighthouse CI gating — post-deploy audits of the live URL (publish dir
+# has no static HTML under SSR). Thresholds are advisory by default;
+# tighten once scores are stable.
+[[plugins]]
+  package = "@netlify/plugin-lighthouse"
+
+  [plugins.inputs]
+    fail_deploy_on_score_thresholds = "false"
+
+  [[plugins.inputs.audits]]
+    url = "/"
+    thresholds = { accessibility = 0.9, "best-practices" = 0.9, seo = 0.9 }

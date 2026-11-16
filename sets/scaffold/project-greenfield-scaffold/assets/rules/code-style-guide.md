@@ -1,7 +1,3 @@
----
-trigger: always_on
----
-
 # Project Code Style Guide
 
 ## Overview
@@ -58,7 +54,7 @@ bun run build
 ### File Organization
 
 ```
-.windsurf/rules/
+docs/rules/
 ├── code-style-guide.md                    # This overview file
 ├── code-style-guide-clean-code-principles.md
 ├── code-style-guide-code-smells-anti-patterns.md
@@ -79,7 +75,7 @@ bun run build
 
 ## Technology Stack
 
-- **Framework**: Nuxt 3 with Vue 3 Composition API
+- **Framework**: Nuxt 4 with Vue 3 Composition API
 - **Language**: TypeScript with strict typing
 - **Styling**: Vuetify + SCSS with BEM methodology
 - **State Management**: Pinia stores
@@ -98,7 +94,7 @@ bun run build
 ## Resources
 
 - [Vue 3 Documentation](https://vuejs.org/)
-- [Nuxt 3 Documentation](https://nuxt.com/)
+- [Nuxt Documentation](https://nuxt.com/)
 - [Pinia Documentation](https://pinia.vuejs.org/)
 - [Vuetify Documentation](https://vuetifyjs.com/)
 - [TypeScript Handbook](https://www.typescriptlang.org/docs/)

@@ -8,7 +8,7 @@ Render the template into the target:
 python3 ./scripts/scaffold.py <target> --name "<name>" --site-url "<url>" [--minimal] [--skip <mod>...] [--force] --verbose
 ```
 
-The script is the single source of truth for the mechanical work: it copies `./assets/template/`, substitutes `{{PROJECT_NAME}}`/`{{PROJECT_SLUG}}`/`{{SITE_URL}}`, strips `// @flag <module>`/`// @endflag <module>` blocks for disabled modules, drops flag-excluded paths, renders `package.json` from `./assets/versions.json` minus flag-stripped deps, and copies `./assets/rules/` into `<target>/.devin/rules`.
+The script is the single source of truth for the mechanical work: it copies `./assets/template/`, substitutes `{{PROJECT_NAME}}`/`{{PROJECT_SLUG}}`/`{{SITE_URL}}`, strips `// @flag <module>`/`// @endflag <module>` blocks for disabled modules, drops flag-excluded paths, renders `package.json` from `./assets/versions.json` minus flag-stripped deps, and copies `./assets/rules/` into `<target>/docs/rules` (passive reference docs — `AGENTS.md` carries the always-on pointer).
 
 **Graceful degradation:** if Python cannot run, do the same job by hand — read `./assets/flags.json` for the excluded-path/dep maps, substitute tokens yourself, and delete flag-marked regions. The outcome is identical; the script is just faster and exact.
 

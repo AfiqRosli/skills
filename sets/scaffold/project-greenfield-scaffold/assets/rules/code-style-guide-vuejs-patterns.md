@@ -1,7 +1,3 @@
----
-trigger: always_on
----
-
 # Vue.js Specific Patterns
 
 ## Overview
@@ -144,9 +140,9 @@ export const useUserData = (
 };
 ```
 
-## Nuxt 3 Auto-Imports
+## Nuxt Auto-Imports
 
-Nuxt 3 provides automatic imports for commonly used utilities:
+Nuxt provides automatic imports for commonly used utilities:
 
 ```vue
 <script setup lang="ts">
@@ -616,6 +612,6 @@ const retry = () => {
 
 - [Vue 3 Documentation](https://vuejs.org/)
 - [Composition API Handbook](https://composition-api.vuejs.org/)
-- [Nuxt 3 Documentation](https://nuxt.com/)
+- [Nuxt Documentation](https://nuxt.com/)
 - [Vue.js Style Guide](https://vuejs.org/style-guide/)
 - [Vue 3 Best Practices](https://learnvue.co/)

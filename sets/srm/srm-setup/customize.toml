@@ -1,0 +1,18 @@
+# DO NOT EDIT -- overwritten on every update.
+#
+# Workflow customization surface for srm-setup.
+# Team overrides:     {project-root}/_bmad/custom/srm-setup.toml
+# Personal overrides: {project-root}/_bmad/custom/srm-setup.user.toml
+
+[workflow]
+
+# --- Universal defaults. Merge: scalars override, arrays append. ---
+activation_steps_prepend = []
+activation_steps_append = []
+persistent_facts = []
+on_complete = ""
+
+# --- Skill-specific points ---
+# Registry seed copied to {project-root}/_bmad/srm/sources.yaml on first setup.
+# Override to seed an org's own source list instead of the shipped one.
+sources_seed_template = "assets/sources-seed.yaml"

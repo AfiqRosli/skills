@@ -118,6 +118,78 @@ class TestResolveItem(unittest.TestCase):
             proc, data = run_resolve(orch, "S10")
             self.assertEqual(data["card"]["declared"], [])
 
+    def test_mock_parsed_from_visual_preview(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            # `path` is reported only when the cited file actually exists
+            adir = orch / "alignment" / "drafts" / "assets" / "S9"
+            adir.mkdir(parents=True)
+            (adir / "mock.html").write_text("<html></html>",
+                                            encoding="utf-8")
+            body = ("# card\n## Visual Preview\n\n"
+                    "- **Wireframe:** https://wiretext.app/w/abc\n"
+                    "- **Mock:** alignment/drafts/assets/S9/mock.html\n\n"
+                    "## Execution Surface\n\n"
+                    "- **Risk surface:** `none`\n")
+            (orch / "alignment" / "drafts" / "S10.md").write_text(
+                body, encoding="utf-8")
+            proc, data = run_resolve(orch, "S10")
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertEqual(data["card"]["mock_status"], "path")
+            self.assertEqual(data["card"]["mock"],
+                             "alignment/drafts/assets/S9/mock.html")
+
+    def test_mock_dead_link_and_unknown(self):
+        """A claimed path that resolves to nothing is `dead-link`, not
+        `path`; a non-path, non-sentinel value is `unknown`."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            body = ("# card\n## Visual Preview\n\n"
+                    "- **Wireframe:** https://wiretext.app/w/abc\n"
+                    "- **Mock:** alignment/drafts/assets/S9/mock.html\n")
+            (orch / "alignment" / "drafts" / "S10.md").write_text(
+                body, encoding="utf-8")
+            proc, data = run_resolve(orch, "S10")
+            self.assertEqual(data["card"]["mock_status"], "dead-link")
+            self.assertEqual(data["card"]["mock"],
+                             "alignment/drafts/assets/S9/mock.html")
+            (orch / "alignment" / "drafts" / "S10.md").write_text(
+                "# card\n## Visual Preview\n\n"
+                "- **Mock:** see figma\n", encoding="utf-8")
+            proc, data = run_resolve(orch, "S10")
+            self.assertEqual(data["card"]["mock_status"], "unknown")
+
+    def test_mock_sentinel_does_not_contaminate_wireframe_status(self):
+        """A Mock line's `n/a`/`unavailable` is LINE-scoped — it must not
+        satisfy the Wireframe line's status check on a malformed card."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            (orch / "alignment" / "drafts" / "S10.md").write_text(
+                "# card\n## Visual Preview\n\n"
+                "- **Mock:** n/a — no UI surface\n",
+                encoding="utf-8")
+            proc, data = run_resolve(orch, "S10")
+            # no Wireframe line at all → absent, not the mock's n/a
+            self.assertEqual(data["card"]["wireframe_status"], "absent")
+
+    def test_mock_unavailable_and_absent(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            (orch / "alignment" / "drafts" / "S10.md").write_text(
+                "# card\n## Visual Preview\n\n"
+                "- **Wireframe:** n/a — no UI surface\n"
+                "- **Mock:** n/a — no UI surface\n", encoding="utf-8")
+            proc, data = run_resolve(orch, "S10")
+            self.assertEqual(data["card"]["mock_status"], "no-ui-surface")
+            self.assertIsNone(data["card"]["mock"])
+            # a card with no Mock line at all → absent
+            (orch / "alignment" / "drafts" / "S10.md").write_text(
+                "# card\n## Visual Preview\n\n"
+                "- **Wireframe:** unavailable — wiretext MCP absent\n",
+                encoding="utf-8")
+            proc, data = run_resolve(orch, "S10")
+            self.assertEqual(data["card"]["mock_status"], "absent")
+
 
 if __name__ == "__main__":
     unittest.main()

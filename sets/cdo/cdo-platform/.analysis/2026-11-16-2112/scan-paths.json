@@ -1,0 +1,142 @@
+{
+  "scanner": "path-standards",
+  "script": "scan-path-standards.py",
+  "version": "3.0.0",
+  "skill_path": "C:\\Core\\Businesses\\skills\\sets\\cdo\\cdo-platform",
+  "timestamp": "2026-11-16T13:12:35.097801+00:00",
+  "files_scanned": [
+    ".analysis\\2026-11-16-2112\\prepass-integrity.json",
+    ".analysis\\2026-11-16-2112\\prepass-metrics.json",
+    ".analysis\\2026-11-16-2112\\scan-paths.json",
+    ".memlog.md",
+    "assets\\seeds\\backlogs\\platform.md",
+    "references\\consult.md",
+    "references\\env-check.md",
+    "references\\push.md",
+    "references\\rollback.md",
+    "references\\ship.md",
+    "SKILL.md"
+  ],
+  "status": "fail",
+  "findings": [
+    {
+      "file": ".memlog.md",
+      "line": 0,
+      "severity": "high",
+      "category": "structure",
+      "title": "Prompt file at skill root: .memlog.md",
+      "detail": "All progressive disclosure content must be in ./references/ \u2014 only SKILL.md belongs at root",
+      "action": "Move .memlog.md to references/.memlog.md"
+    },
+    {
+      "file": "references\\ship.md",
+      "line": 13,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "`refs/heads/cdo-lane` is the org's local-only integration ref \u2014 the lane's unpushed tip. Never pushed, never checked out",
+      "action": ""
+    },
+    {
+      "file": "references\\ship.md",
+      "line": 15,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "- **Worktree drain:** the worker commits in its worktree \u2014 `./scripts/ship-commit.py --project-root {root} --orchestrati",
+      "action": ""
+    },
+    {
+      "file": "references\\ship.md",
+      "line": 15,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "- **Worktree drain:** the worker commits in its worktree \u2014 `./scripts/ship-commit.py --project-root {root} --orchestrati",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 21,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "2. Verify registration \u2014 `capabilities.yaml` `departments.cdo-platform`. Missing \u2192 `./scripts/setup.py`.",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 30,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "| `setup` | `./scripts/setup.py` | install \u2014 seed backlog, register capabilities |",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 31,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "| `ship {key}` | `./references/ship.md` | verified \u2192 local lane landing (prod \u2192 sign-off only) |",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 32,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "| `push` | `./references/push.md` | signed `## Pre-deploy Sign-offs` \u2192 `push-lane.py` \u2192 origin publish |",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 33,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "| `env-check` | `./references/env-check.md` | `env-scan.py` coverage \u2192 requisitions + temp-placeholder flags |",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 34,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "| `rollback {key}` | `./references/rollback.md` | revert the story's merge + journal |",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 35,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "| `consult {\u2026}` / no args | `./references/consult.md` | office-hours \u2014 advisory, read-only, notes \u2192 `consult/platform.md",
+      "action": ""
+    }
+  ],
+  "assessments": {},
+  "summary": {
+    "total_findings": 11,
+    "by_severity": {
+      "critical": 0,
+      "high": 11,
+      "medium": 0,
+      "low": 0
+    },
+    "by_category": {
+      "double_prefix": 0,
+      "bare_bmad": 0,
+      "absolute_path": 0,
+      "relative_prefix": 0,
+      "cross_dir_dot_slash": 10,
+      "frontmatter": 0,
+      "structure": 1
+    },
+    "assessment": "Path standards scan complete"
+  }
+}

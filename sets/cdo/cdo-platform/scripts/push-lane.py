@@ -180,6 +180,7 @@ def cmd_run(root: Path, orch: Path, lane: str):
               "errors": ["flow-ledger.yaml missing/unparseable"]}, 2,
              args.output)
     views = story_views(ledger)
+    warnings = []
     pushable = [v for v in views if v["signed"] and not v["pushed"]]
     # a signed story whose status regressed (killed/deferred between sign
     # and push) is no longer pushable — the signature asked for shipped work
@@ -310,10 +311,22 @@ def cmd_run(root: Path, orch: Path, lane: str):
                                 "raw": (heal.stdout or heal.stderr)[:200]}
     if plan["lane_advance"].get("status") not in \
             ("advanced", "already-abreast", "reconciled"):
-        plan["warnings"] = plan.get("warnings", []) + [
+        warnings.append(
             "lane advance refused: "
             + "; ".join(plan["lane_advance"].get("errors",
-                        [plan["lane_advance"].get("status", "?")])[:2])]
+                        [plan["lane_advance"].get("status", "?")])[:2]))
+    pop = plan["lane_advance"].get("stash_pop") or {}
+    if pop.get("status") == "conflicts":
+        warnings.append(
+            "ad-hoc WIP stash pop conflicted on "
+            + ", ".join(pop.get("files") or ["(see stash)"])
+            + f" — WIP kept in {pop.get('ref', 'stash')}")
+    elif pop.get("status") == "deferred":
+        warnings.append(
+            "ad-hoc WIP stayed stashed (merge unresolved): "
+            + pop.get("ref", "stash"))
+    if warnings:
+        plan["warnings"] = warnings
 
     plan.update({"status": "pushed", "at": at,
                  "stamped": [v["key"] for v in covered],

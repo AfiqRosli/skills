@@ -1,0 +1,5 @@
+// Vuetify SASS settings layer — referenced by vite-plugin-vuetify
+// styles.configFile. Per-component Sass variables and overrides go here
+// via `@use "vuetify/settings" with (...)` when needed.
+
+@forward "vuetify/settings";

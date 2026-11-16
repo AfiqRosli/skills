@@ -1,0 +1,149 @@
+diff --git a/sets/srm/srm-setup/SKILL.md b/sets/srm/srm-setup/SKILL.md
+index 4ce83c4..b396b5a 100644
+--- a/sets/srm/srm-setup/SKILL.md
++++ b/sets/srm/srm-setup/SKILL.md
+@@ -63,6 +63,8 @@ After config is written, create `{project-root}/_bmad/srm/` and seed the sources
+ 
+ **Review the seeded prefixes with the user.** Nothing is mapped until `srm-sync` runs, so this is the free moment to override. Show the seeded entries as a table (name → prefix → path → layout) and ask whether the prefixes are acceptable. If the user wants a different prefix, edit `prefix:` for that entry in `sources.yaml` — a plain rename at this stage costs nothing because no `<prefix>-*` skills exist yet. Do not run `srm-sync` as part of setup; mapping is the user's explicit next step.
+ 
++**Check which seeds are already cloned.** Resolve `{skills_repo_root}` from the config just written and stat each seeded `path`. Report plainly — "2 of 6 sources cloned locally" — and if any are missing, tell the user `srm-sync` will clone the rest on demand (`--clone-missing` fetches each via its registry `url`; a plain `srm-sync` lists them as `missing` and offers the same). This sets expectations for a fresh workspace, where typically none exist yet.
++
+ The registry maps external repos to this project: `path` (may use the `{skills_repo_root}` token), the user-chosen `prefix`, `layout` (`grouped` = BMad source modules, `flat` = dir of SKILL.md folders), `git_pull`, and `skills_paths`. Users manage it afterwards through the `srm-sync` skill (`add`/`remove`/`list`) — never by editing config.yaml.
+ 
+ ## Cleanup Legacy Directories
+diff --git a/sets/srm/srm-setup/assets/module-help.csv b/sets/srm/srm-setup/assets/module-help.csv
+index c25e8f5..2d9e0a7 100644
+--- a/sets/srm/srm-setup/assets/module-help.csv
++++ b/sets/srm/srm-setup/assets/module-help.csv
+@@ -1,7 +1,7 @@
+ module,skill,display-name,menu-code,description,action,args,phase,after,before,required,output-location,outputs
+ Skills Repo Manager,_meta,,,,,,,,,false,,
+ Skills Repo Manager,srm-setup,Module Setup,SU,Installs and configures the Skills Repo Manager module — collects skills repo root and git-pull preference, seeds the sources registry.,setup,,anytime,,,true,,
+-Skills Repo Manager,srm-sync,Sync Repos,SY,"Pulls each registered repo (git pull --ff-only, never modifies sources), adapts skills into BMad structure, and materializes them as prefixed skills — then prunes stale mappings.",sync,,anytime,srm-setup:setup,,false,,
++Skills Repo Manager,srm-sync,Sync Repos,SY,"Pulls each registered repo (git pull --ff-only, never modifies sources), clones any not yet checked out (--clone-missing), adapts skills into BMad structure, and materializes them as prefixed skills — then prunes stale mappings.",sync,,anytime,srm-setup:setup,,false,,
+ Skills Repo Manager,srm-sync,Add Repo,AR,Registers an external skill repo — auto-detects its layout (grouped BMad module or flat skills dir) and asks what prefix to prepend to mapped skills.,add,[repo-path],anytime,srm-setup:setup,srm-sync:sync,false,,
+ Skills Repo Manager,srm-sync,List Sources,LS,Lists registered repos with their prefixes and last-sync status.,list,,anytime,,,false,,
+ Skills Repo Manager,srm-sync,Remove Repo,RM,Unregisters a repo and removes its mapped skills from the project.,remove,[repo-name],anytime,,,false,,
+diff --git a/sets/srm/srm-setup/assets/sources-seed.yaml b/sets/srm/srm-setup/assets/sources-seed.yaml
+index 7d1f69b..64a1b88 100644
+--- a/sets/srm/srm-setup/assets/sources-seed.yaml
++++ b/sets/srm/srm-setup/assets/sources-seed.yaml
+@@ -3,7 +3,8 @@
+ # if you know the schema (see srm-sync/references/adaptation.md).
+ #
+ #   name          display name — also the module label in module-help.csv
+-#   url           informational clone URL
++#   url           clone URL — `srm-sync --clone-missing` fetches a missing
++#                 repo from here; leave empty for hand-managed checkouts
+ #   path          repo location; may use {skills_repo_root} or {project-root}
+ #   prefix        prepended to every mapped skill (user-chosen at add time)
+ #   layout        grouped = each skills_path is a BMad module dir
+diff --git a/sets/srm/srm-sync/SKILL.md b/sets/srm/srm-sync/SKILL.md
+index 4f218e3..2d22ef9 100644
+--- a/sets/srm/srm-sync/SKILL.md
++++ b/sets/srm/srm-sync/SKILL.md
+@@ -42,12 +42,14 @@ Route on the user's intent:
+ python ./scripts/sync.py sync --config-root "{project-root}"
+ ```
+ 
+-Options: `--repo <name>` (one repo only), `--no-pull` (skip git pull), `--prune` (delete stale skills — **only after the user confirms the stale list**).
++Options: `--repo <name>` (one repo only), `--no-pull` (skip git pull), `--clone-missing` (clone registered repos that aren't checked out yet, via each entry's registry `url`), `--prune` (delete stale skills — **only after the user confirms the stale list**).
+ 
+ For each repo: pulls (if enabled), resolves each `skills_paths` entry, adapts and copies skills, refreshes that repo's help-CSV block in `{project-root}/_bmad/module-help.csv`, then scans for stale `.srm-origin` skills.
+ 
+ Report the JSON result plainly: skills mapped (with counts per repo), skipped collisions, warnings, stale list. If `stale` is non-empty, show it and ask whether to re-run with `--prune` — do not prune uninvited.
+ 
++If `missing` is non-empty, those repos are registered but not cloned locally — common on a fresh workspace right after `srm-setup` seeds the registry. Show the list (name, expected path, url) and offer to re-run with `--clone-missing` to fetch them all, or `clone --url <url>` for one — do not clone uninvited. Entries with an empty `url` can't be fetched; the user must clone those by hand to the registered `path` (or fix the entry).
++
+ ### add
+ 
+ 0. **If the user gave a remote URL** (`https://github.com/<owner>/<repo>` or `git@host:<owner>/<repo>`) instead of a local path, clone it first:
+diff --git a/sets/srm/srm-sync/scripts/sync.py b/sets/srm/srm-sync/scripts/sync.py
+index 339c6be..f45207f 100644
+--- a/sets/srm/srm-sync/scripts/sync.py
++++ b/sets/srm/srm-sync/scripts/sync.py
+@@ -11,6 +11,7 @@ Never modifies source repos. The only ops run on a source are `git clone`
+ 
+ Commands:
+   sync    Materialize all (or one) registered repos into the skills dir.
++          --clone-missing fetches registered repos that aren't checked out.
+   detect  Inspect a repo path and print suggested registry entry as JSON.
+   clone   Clone a remote URL into skills_repo_root/<owner>/<repo>.
+   add     Append a repo entry to the registry (prefix must be given).
+@@ -481,14 +482,14 @@ GIT_URL_RE = re.compile(
+ )
+ 
+ 
+-def cmd_clone(args, vars_):
++def clone_into(url, vars_):
+     """Clone a remote repo into <skills_repo_root>/<owner>/<repo>.
+ 
+     Returns the registry-form path (with the literal {skills_repo_root} token)
+     so `detect`/`add` can be fed straight from this output. Never overwrites an
+     existing checkout — reports `exists` instead.
+     """
+-    url = (args.url or "").strip()
++    url = (url or "").strip()
+     m = GIT_URL_RE.match(url)
+     if not m:
+         return {"status": "error",
+@@ -517,6 +518,10 @@ def cmd_clone(args, vars_):
+             "resolved": str(target), "name": repo, "url": url}
+ 
+ 
++def cmd_clone(args, vars_):
++    return clone_into(args.url, vars_)
++
++
+ def cmd_add(args, reg_path):
+     data = registry_load(reg_path)
+     if registry_get(data, args.name):
+@@ -573,15 +578,34 @@ def cmd_sync(args, reg_path, skills_dir, project_root, vars_):
+         if not r:
+             return {"status": "error", "message": f"repo '{args.repo}' not in registry"}
+         repos = [r]
+-    report = {"status": "ok", "repos": {}, "mapped": [], "skipped": [], "warnings": []}
++    report = {"status": "ok", "repos": {}, "mapped": [], "skipped": [], "warnings": [], "missing": []}
+     for repo in repos:
+         rroot = Path(resolve(repo["path"], vars_))
+         rrep = {"path": str(rroot), "pulled": None, "commit": None, "mapped": 0}
+         if not rroot.is_dir():
+-            rrep["error"] = "path not found"
+-            report["repos"][repo["name"]] = rrep
+-            report["warnings"].append(f"{repo['name']}: {rroot} not found")
+-            continue
++            missing = {"name": repo["name"], "path": str(rroot), "url": repo.get("url", "")}
++            if args.clone_missing and repo.get("url"):
++                cl = clone_into(repo["url"], vars_)
++                if cl["status"] == "error":
++                    rrep["error"] = cl["message"]
++                    report["repos"][repo["name"]] = rrep
++                    report["missing"].append(missing)
++                    report["warnings"].append(f"{repo['name']}: clone failed — {cl['message']}")
++                    continue
++                rrep["cloned"] = cl["status"]
++                if Path(cl["resolved"]) != rroot:
++                    repo["path"] = cl["path"]
++                    save_yaml(reg_path, data)
++                    rrep["path"] = cl["resolved"]
++                rroot = Path(cl["resolved"])
++            else:
++                rrep["error"] = "path not found"
++                report["repos"][repo["name"]] = rrep
++                report["missing"].append(missing)
++                report["warnings"].append(
++                    f"{repo['name']}: {rroot} not found"
++                    + ("" if repo.get("url") else " (no url — cannot clone)"))
++                continue
+         if repo.get("git_pull", True) and vars_["git_pull"] and not args.no_pull and is_git_repo(rroot):
+             rc, out, err = git(rroot, "pull", "--ff-only")
+             rrep["pulled"] = {"rc": rc, "out": out[-300:], "err": err[-300:]}
+@@ -674,6 +698,8 @@ def main():
+     ap.add_argument("--layout", default="flat", choices=["flat", "grouped", "auto"])
+     ap.add_argument("--skills-paths", default="")
+     ap.add_argument("--no-pull", action="store_true")
++    ap.add_argument("--clone-missing", action="store_true",
++                    help="clone registered repos not yet checked out (uses each entry's url)")
+     ap.add_argument("--prune", action="store_true")
+     ap.add_argument("--delete-skills", action="store_true")
+     args = ap.parse_args()

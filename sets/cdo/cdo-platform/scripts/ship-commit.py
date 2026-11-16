@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # /// script
 # requires-python = ">=3.9"
+# dependencies = ["pyyaml"]
 # ///
 """ship-commit.py — the deterministic ship-commit trio in one call.
 
@@ -15,9 +16,14 @@ What was four prose copies (sweep artifacts → stage → commit):
   ship-commit.py --project-root {root} --orchestration-dir {orch}
       --keys {k[,k2]} --message "cdo {key}: shipped"
       [--work-tree {dir}] [--add-all | --paths p...] [--no-verify]
+      [--require-status verified]
 
-Exit 0 committed/nothing-to-commit, 1 ship-artifacts failed, 2 error.
-Stdlib only.
+`--require-status {status}` gates the commit on the ledger: every key
+must read that status in flow-ledger.yaml (the per-story ship steps
+pass `verified` — the cardinal-sin gate becomes structural). Leave it
+off for post-ship artifact sweeps (their keys already read `shipped`).
+
+Exit 0 committed/nothing-to-commit, 1 refused/failed, 2 error.
 """
 
 import argparse
@@ -26,6 +32,12 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+
+try:
+    import yaml
+except ImportError:
+    print("error: pyyaml is required (PEP 723 dependency)", file=sys.stderr)
+    sys.exit(2)
 
 RESERVED = [f":!**/{n}" for n in
             ["nul", "con", "prn", "aux"]
@@ -47,6 +59,9 @@ def parse_args():
     p.add_argument("--paths", nargs="*", default=[],
                    help="extra paths to stage (story code files)")
     p.add_argument("--no-verify", action="store_true")
+    p.add_argument("--require-status", default=None, metavar="STATUS",
+                   help="refuse unless every key reads this status in "
+                        "flow-ledger.yaml (per-story ships pass 'verified')")
     p.add_argument("-o", "--output")
     return p.parse_args()
 
@@ -65,11 +80,29 @@ def git(cwd: Path, *args):
                           capture_output=True, text=True)
 
 
+def check_status(orch: Path, keys: list, required: str):
+    """Every key must read `required` in the ledger — the ship gate."""
+    led = orch / "flow-ledger.yaml"
+    stories = {}
+    if led.is_file():
+        doc = yaml.safe_load(led.read_text(encoding="utf-8")) or {}
+        stories = doc.get("stories") or {}
+    return [f"{k} reads '{(stories.get(k) or {}).get('status')}', "
+            f"requires '{required}'"
+            for k in keys if (stories.get(k) or {}).get("status") != required]
+
+
 def main():
     args = parse_args()
     root = Path(args.project_root).resolve()
     orch = Path(args.orchestration_dir).resolve()
     work = Path(args.work_tree).resolve() if args.work_tree else root
+
+    if args.require_status:
+        keys = [k.strip() for k in args.keys.split(",") if k.strip()]
+        bad = check_status(orch, keys, args.require_status)
+        if bad:
+            emit({"status": "refused", "errors": bad}, 1, args.output)
 
     # root-relative, not Path(__file__): worktree spawns snapshot-copy
     # .agents into the worktree — __file__ there points at the stale copy

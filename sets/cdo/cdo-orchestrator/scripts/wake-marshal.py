@@ -23,9 +23,24 @@ OPERATOR = "Operator"
 
 
 def _operator_name(root: Path) -> str:
-    """'Operator Afiq' — _bmad/config.user.yaml `user_name`, then the
-    BMAD user block."""
+    """'Operator Afiq' — TOML core.user_name via the installer's resolver
+    (canonical on BMAD v6.12+), then _bmad/config.user.yaml `user_name`,
+    then the shared config's root key."""
+    import json
     import re
+    script = root / "_bmad" / "scripts" / "resolve_config.py"
+    if script.is_file():
+        try:
+            proc = subprocess.run(
+                ["uv", "run", str(script), "--project-root", str(root),
+                 "--key", "core.user_name"],
+                capture_output=True, text=True, timeout=60)
+            if proc.returncode == 0:
+                name = json.loads(proc.stdout).get("core.user_name", "")
+                if isinstance(name, str) and name.strip():
+                    return f"{OPERATOR} {name.strip()}"
+        except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+            pass
     for name in ("config.user.yaml", "config.yaml"):
         cfg = root / "_bmad" / name
         if cfg.is_file():

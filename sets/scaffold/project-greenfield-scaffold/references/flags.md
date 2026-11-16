@@ -13,7 +13,7 @@ Three removal mechanisms work together — `scaffold.py` applies all of them:
 | Module | What it adds | When to skip |
 | ------ | ------------ | ------------ |
 | `core` | Nuxt 4, Vuetify 4, Pinia, Elysia, TS strict, SCSS/BEM, ESLint, husky, layouts, theme, interfaces, utils, example router/store/page | never (always on) |
-| `rules` | `.devin/rules/` — the 16-file code-style-guide set | project won't follow the style guide |
+| `rules` | `docs/rules/` — the 16-file code-style-guide set (passive docs) + the `AGENTS.md` Code Style pointer | project won't follow the style guide |
 | `tests` | `vitest.config.ts`, `playwright.config.ts`, `tests/`, test scripts, vitest+playwright deps | throwaway prototype |
 | `db` | `server/db/` (neon-http client + withDbTx), `drizzle.config.ts`, drizzle deps, db:* scripts | no database |
 | `auth` | `auth.ts`, `auth-schema.ts`, `lib/auth-client.ts`, `middleware/auth.global.ts`, `server/auth.ts`, `AuthStore`, sign-in/register pages, better-auth deps | public-only site |

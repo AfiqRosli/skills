@@ -17,7 +17,7 @@ Then deliver the health report:
 - Module set rendered (enabled / disabled / auto-disabled)
 - Verify results per command
 - **Operator checklist** — what only a human can finish: real `DATABASE_URL`, `BETTER_AUTH_SECRET`, OAuth keys, Polar product IDs, `RESEND_API_KEY`, `SENTRY_DSN`, `REDIS_URL`, favicon files in `public/`, Netlify site link (`netlify link`)
-- Point at `docs/getting-started.md` and `.devin/rules/code-style-guide.md` as the onboarding reads
+- Point at `docs/getting-started.md`, `AGENTS.md`, and `docs/rules/code-style-guide.md` as the onboarding reads
 
 Persist the health report — the scaffold script already wrote `<target>/.scaffold-report.json` at render time; append the verify results there (or include them in it) so a later session or pipeline step can resume from state instead of archaeology.
 

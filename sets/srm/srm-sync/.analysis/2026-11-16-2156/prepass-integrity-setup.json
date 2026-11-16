@@ -1,0 +1,80 @@
+{
+  "scanner": "workflow-integrity-prepass",
+  "script": "prepass-workflow-integrity.py",
+  "version": "1.0.0",
+  "skill_path": "sets\\srm\\srm-setup",
+  "timestamp": "2026-11-16T13:56:10.139774+00:00",
+  "status": "pass",
+  "metadata": {
+    "frontmatter": {
+      "name": "srm-setup",
+      "description": "Sets up Skills Repo Manager module in a project. Use when the user requests to 'install srm module', 'configure Skills Repo Manager', or 'setup Skills Repo Manager'."
+    },
+    "sections": [
+      {
+        "level": 2,
+        "title": "Overview",
+        "line": 8
+      },
+      {
+        "level": 2,
+        "title": "On Activation",
+        "line": 20
+      },
+      {
+        "level": 2,
+        "title": "Collect Configuration",
+        "line": 31
+      },
+      {
+        "level": 2,
+        "title": "Write Files",
+        "line": 41
+      },
+      {
+        "level": 2,
+        "title": "Create Output Directories",
+        "line": 56
+      },
+      {
+        "level": 2,
+        "title": "Seed the Sources Registry",
+        "line": 60
+      },
+      {
+        "level": 2,
+        "title": "Cleanup Legacy Directories",
+        "line": 70
+      },
+      {
+        "level": 2,
+        "title": "Confirm",
+        "line": 84
+      },
+      {
+        "level": 2,
+        "title": "Outcome",
+        "line": 88
+      }
+    ],
+    "workflow_type": "simple-workflow"
+  },
+  "stage_summary": {
+    "total_stages": 0,
+    "referenced": [],
+    "actual": [],
+    "missing_stages": [],
+    "orphaned_stages": []
+  },
+  "prompt_details": [],
+  "issues": [],
+  "summary": {
+    "total_issues": 0,
+    "by_severity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    }
+  }
+}

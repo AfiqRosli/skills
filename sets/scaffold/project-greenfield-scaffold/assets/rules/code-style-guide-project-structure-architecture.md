@@ -1,7 +1,3 @@
----
-trigger: always_on
----
-
 # Project Structure & Architecture
 
 ## Overview
@@ -141,10 +137,9 @@ import { validateEmail } from "@/utils/validators";
 
 ```
 project-root/
-├── .windsurf/                 # BMAD configuration
-│   ├── rules/                 # Code style guides
-│   ├── skills/                # BMAD skills
-│   └── workflows/             # BMAD workflows
+├── AGENTS.md                  # Agent instructions — always-on context
+├── docs/                      # Documentation
+│   └── rules/                 # Code style guides (read on demand)
 ├── assets/                    # Static assets
 │   ├── styles/                # Global styles
 │   │   ├── global.scss

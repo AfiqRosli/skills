@@ -1,0 +1,102 @@
+{
+  "scanner": "scripts",
+  "script": "scan-scripts.py",
+  "version": "2.0.0",
+  "skill_path": "C:\\Core\\Businesses\\skills\\sets\\cdo\\cdo-platform",
+  "timestamp": "2026-11-16T13:12:36.292618+00:00",
+  "status": "pass",
+  "findings": [
+    {
+      "file": "scripts/cardlayout.py",
+      "line": 1,
+      "severity": "medium",
+      "category": "agentic-design",
+      "title": "No argparse found \u2014 script lacks --help self-documentation",
+      "detail": "",
+      "action": "Add argparse with description and argument help text"
+    },
+    {
+      "file": "scripts/cardlayout.py",
+      "line": 1,
+      "severity": "medium",
+      "category": "agentic-design",
+      "title": "No json.dumps found \u2014 output may not be structured JSON",
+      "detail": "",
+      "action": "Use json.dumps for structured output parseable by workflows"
+    },
+    {
+      "file": "scripts/cardlayout.py",
+      "line": 1,
+      "severity": "low",
+      "category": "agentic-design",
+      "title": "No sys.exit() calls \u2014 may not return meaningful exit codes",
+      "detail": "",
+      "action": "Return 0=success, 1=fail, 2=error via sys.exit()"
+    },
+    {
+      "file": "scripts/cardlayout.py",
+      "line": 1,
+      "severity": "medium",
+      "category": "tests",
+      "title": "No unit test found for cardlayout.py",
+      "detail": "",
+      "action": "Create scripts/tests/test-cardlayout.py with test cases"
+    },
+    {
+      "file": "scripts/ship-commit.py",
+      "line": 1,
+      "severity": "medium",
+      "category": "tests",
+      "title": "No unit test found for ship-commit.py",
+      "detail": "",
+      "action": "Create scripts/tests/test-ship-commit.py with test cases"
+    }
+  ],
+  "assessments": {
+    "lint_summary": {
+      "tools_used": [],
+      "files_linted": 9,
+      "lint_issues": 0
+    },
+    "script_summary": {
+      "total_scripts": 9,
+      "by_type": {
+        "python": 9,
+        "shell": 0,
+        "node": 0,
+        "other": 0
+      },
+      "scripts": {
+        "python": [
+          "advance-lane.py",
+          "cardlayout.py",
+          "env-scan.py",
+          "land.py",
+          "push-lane.py",
+          "setup.py",
+          "ship-artifacts.py",
+          "ship-commit.py",
+          "sweep-worktrees.py"
+        ]
+      },
+      "missing_tests": [
+        "cardlayout.py",
+        "ship-commit.py"
+      ]
+    }
+  },
+  "summary": {
+    "total_findings": 5,
+    "by_severity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 4,
+      "low": 1
+    },
+    "by_category": {
+      "agentic-design": 3,
+      "tests": 2
+    },
+    "assessment": ""
+  }
+}

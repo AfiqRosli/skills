@@ -8,24 +8,40 @@ House skill modules, installable into any project's `.agents/skills` via the exe
 
 | Bin        | Skills                                                        | Purpose                                        |
 | ---------- | ------------------------------------------------------------- | ---------------------------------------------- |
-| `cdo`      | `cdo-*` (26)                                                  | Autonomous Delivery Org — departments + pipeline |
 | `srm`      | `srm-setup`, `srm-sync`                                       | Skills Repo Manager — maps external skill repos  |
+| `cdo`      | `cdo-*` (26)                                                  | Autonomous Delivery Org — departments + pipeline |
 | `scaffold` | `project-greenfield-scaffold`                                 | Greenfield project scaffold on the house spine   |
 
 ## Install
 
-```bash
-# bun
-bunx -p github:AfiqRosli/skills cdo
-bunx -p github:AfiqRosli/skills srm
-bunx -p github:AfiqRosli/skills scaffold
+**Prerequisite — official BMAD.** These sets are BMad modules and expect a real BMAD install at `_bmad/config.yaml` (`cdo` refuses to set up without one). Install it manually first, from your project root — follow the interactive installer from [bmad-code-org/BMAD-METHOD](https://github.com/bmad-code-org/BMAD-METHOD):
 
+```bash
+bunx bmad-method install
+```
+
+Then install the sets in order:
+
+```bash
+# 1. Skills Repo Manager — manages external skill repos
+bunx -p github:AfiqRosli/skills srm
+
+# 2. Autonomous Delivery Org — departments + pipeline
+bunx -p github:AfiqRosli/skills cdo
+
+# 3. Greenfield scaffold — optional, only when starting a new project
+bunx -p github:AfiqRosli/skills scaffold
+```
+
+Other runners work the same way:
+
+```bash
 # npm
-npx -y -p github:AfiqRosli/skills cdo
+npx -y -p github:AfiqRosli/skills srm
 
 # pnpm / yarn
-pnpm dlx -p github:AfiqRosli/skills cdo
-yarn dlx -p github:AfiqRosli/skills cdo
+pnpm dlx -p github:AfiqRosli/skills srm
+yarn dlx -p github:AfiqRosli/skills srm
 ```
 
 Run from your project root. Skills land in `.agents/skills/`; a `.agents/skills-manifest.json` tracks what each set installed for upgrade/uninstall.
@@ -39,16 +55,16 @@ bunx -p github:AfiqRosli/skills#v0.1.0 cdo
 ### Flags
 
 ```
-cdo --list              # show what the set ships
-cdo --dir <path>        # install into a different project root
-cdo --uninstall         # remove the set's skills from this project
-cdo --dry-run           # preview without writing
+<set> --list            # show what the set ships
+<set> --dir <path>      # install into a different project root
+<set> --uninstall       # remove the set's skills from this project
+<set> --dry-run         # preview without writing
 ```
 
 ### After install
 
-- `cdo` → invoke the `cdo-setup` skill (requires a git repo and an official BMAD install at `_bmad/config.yaml`)
 - `srm` → invoke `srm-setup`, then `srm-sync`
+- `cdo` → invoke the `cdo-setup` skill (requires a git repo and an official BMAD install at `_bmad/config.yaml`)
 - `scaffold` → invoke `project-greenfield-scaffold`
 
 ## Authoring & releasing

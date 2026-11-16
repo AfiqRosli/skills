@@ -162,6 +162,33 @@ def main() -> int:
         for k, v in read_flat_config(cfg, root).items():
             config.setdefault(k, v)
 
+    # TOML overlay — on BMAD v6.12+ the installer manages config.toml layers
+    # (core.* + modules.bmm.*) via _bmad/scripts/resolve_config.py; YAML files
+    # above remain the module-section contract and pre-6.12 fallback. TOML
+    # wins for the flat keys it carries. modules.bmm assumes the standard
+    # BMAD Method module code — a renamed module misses these keys and
+    # silently keeps the YAML values (fails soft by design).
+    toml_keys = (
+        [f"core.{k}" for k in ("user_name", "communication_language",
+                               "document_output_language", "output_folder")]
+        + [f"modules.bmm.{k}" for k in ("user_skill_level", "planning_artifacts",
+                                        "implementation_artifacts", "project_knowledge")]
+    )
+    resolver = root / "_bmad" / "scripts" / "resolve_config.py"
+    if resolver.is_file():
+        cmd = ["uv", "run", str(resolver), "--project-root", str(root)]
+        for k in toml_keys:
+            cmd += ["--key", k]
+        try:
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            if proc.returncode == 0:
+                for dotted, v in json.loads(proc.stdout).items():
+                    if isinstance(v, str) and v:
+                        config[dotted.rsplit(".", 1)[-1]] = v.replace(
+                            "{project-root}", str(root))
+        except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+            pass
+
     impl = Path(config.get("implementation_artifacts", root / "_bmad-output" / "implementation-artifacts"))
 
     def sprint_sort_key(p: Path) -> tuple:

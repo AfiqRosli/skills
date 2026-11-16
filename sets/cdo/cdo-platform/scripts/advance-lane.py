@@ -31,18 +31,20 @@ files that overlap the incoming diff — or the lane itself carries
 commits {to} lacks (e.g. an earlier reconcile checkpoint survived a
 crash/abort, or the Operator committed ad-hoc work on the lane) —
   1. staged index → refused: don't compound a half-staged state
-  2. checkpoint ALL dirty paths as `cdo state: checkpoint` — org-state
-     churn AND Operator ad-hoc WIP get committed, never discarded
-     (hooks bypassed — bookkeeping commits shouldn't pay the repo's
-     eslint gate; ephemeral `locks/` dirs under the state roots and
-     Windows reserved names are excluded so they never ride the lane
-     to origin)
-  3. `git merge --no-ff {to}`, resolve state-root conflicts --ours
+  2. ad-hoc WIP (dirty paths outside the state roots) → `git stash
+     push -u` aside — Operator work never rides the lane and never
+     reaches origin; popped back after the merge resolves, with pop
+     conflicts keeping the stash entry and reporting, never dropping
+  3. remaining dirty paths (org-state churn) → `cdo state: checkpoint`
+     commit (hooks bypassed — bookkeeping commits shouldn't pay the
+     repo's eslint gate; ephemeral `locks/` dirs under the state roots
+     and Windows reserved names are excluded so they never ride the
+     lane to origin)
+  4. `git merge --no-ff {to}`, resolve state-root conflicts --ours
      (live state is always newer than the lane's ship-time snapshot);
      conflicts outside the state roots → abort + report — the ad-hoc
-     WIP is already safe in the checkpoint commit, a human merges by
-     hand
-  4. when --to names a refs/heads/* ref, FF it to the merge result
+     WIP is restored from the stash, a human merges by hand
+  5. when --to names a refs/heads/* ref, FF it to the merge result
      (CAS against the resolved target) so cdo-lane stays abreast
 
 Stdlib only — callable via sys.executable from sibling scripts (push-lane).
@@ -292,12 +294,50 @@ def reconcile(root: Path, target: str, lane_ref: str, roots: list,
             lock.unlink(missing_ok=True)
 
 
+WIP_STASH_MSG = "cdo reconcile: ad-hoc WIP aside"
+# linked worktrees surface as untracked dirs — a stash add would record
+# a gitlink and the pop could fight the live tree; org machinery, not WIP
+SKIP_STASH_ROOTS = [".cdo-work"]
+
+
+def _wip_stash_ref(root: Path) -> str:
+    """Our stash entry's ref (stash@{n}) or "" — matched by message so a
+    crash-left entry from an earlier reconcile is found too."""
+    for line in git(root, "stash", "list").stdout.splitlines():
+        if WIP_STASH_MSG in line:
+            return line.split(":", 1)[0].strip()
+    return ""
+
+
+def _pop_wip(root: Path) -> dict:
+    """Restore the stashed ad-hoc WIP after the merge settles. A clean
+    pop drops the entry; a conflicted one keeps it (git never drops on a
+    conflicted pop) — the WIP is safe either way. Deferred while a merge
+    is still unresolved. No-op when nothing of ours is stashed."""
+    ref = _wip_stash_ref(root)
+    if not ref:
+        return None
+    if (git_common_dir(root) / "MERGE_HEAD").exists():
+        return {"status": "deferred", "ref": ref,
+                "reason": "merge still unresolved — WIP stays stashed"}
+    pop = git(root, "stash", "pop", ref)
+    if pop.returncode == 0:
+        return {"status": "restored", "ref": ref}
+    conflicts = [l for l in
+                 git(root, "diff", "--name-only", "--diff-filter=U")
+                 .stdout.splitlines() if l.strip()]
+    return {"status": "conflicts", "ref": ref,
+            "files": conflicts or None,
+            "detail": (pop.stderr or pop.stdout).strip()[:300]}
+
+
 def _reconcile_locked(root: Path, target: str, lane_ref: str,
                       roots: list, plan: dict, blocking: list):
-    """FF blocked by dirty paths or a diverged lane: checkpoint every
-    dirty path on the lane branch (org-state churn AND ad-hoc WIP),
-    merge the target, resolve state-root conflicts --ours, abort on
-    anything else — aborted merges leave the WIP in the checkpoint."""
+    """FF blocked by dirty paths or a diverged lane: stash ad-hoc WIP
+    aside, checkpoint the remaining dirty paths on the lane branch
+    (org-state churn), merge the target, resolve state-root conflicts
+    --ours, abort on anything else — then pop the WIP back so it returns
+    uncommitted, whatever the merge did."""
     merge_msg = (f"Merge {args.to} into {args.lane} — reconcile shipped "
                  "work with local state checkpoint")
     conflicts = []
@@ -338,61 +378,88 @@ def _reconcile_locked(root: Path, target: str, lane_ref: str,
               "errors": ["index already staged — refusing to compound a "
                          "half-staged state"]}, 1, args.output)
 
+    failure = None
     if not merged:
-        # checkpoint the WHOLE dirty tree — org-state churn and ad-hoc
-        # Operator WIP alike — so no uncommitted work can block or be
-        # lost to the merge; locks dirs + reserved names stay out
-        adhoc = [d for d in dirty_paths(root)
-                 if not under_roots(d, roots)]
-        if adhoc:
-            plan["adhoc_checkpointed"] = adhoc
+        # ad-hoc WIP (outside the state roots) goes aside into a stash —
+        # Operator work is never committed onto the lane and never
+        # pushes; org-state churn still checkpoints so live state
+        # converges (it is always newer than the ship-time snapshot)
+        stashed = [d for d in dirty_paths(root)
+                   if not under_roots(d, roots)
+                   and not under_roots(d, SKIP_STASH_ROOTS)
+                   and Path(d).name not in RESERVED_NAMES]
+        if stashed:
+            sp = git(root, "stash", "push", "-u", "-m", WIP_STASH_MSG,
+                     "--", *stashed)
+            if sp.returncode != 0 or not _wip_stash_ref(root):
+                emit({**plan, "status": "refused", "action": "reconcile",
+                      "errors": ["ad-hoc WIP stash failed: "
+                                 + (sp.stderr or sp.stdout)
+                                 .strip()[:300]]}, 1, args.output)
+            plan["adhoc_stashed"] = stashed
+
+        # checkpoint the remaining dirty tree — org-state churn only,
+        # now that ad-hoc WIP is stashed; locks dirs + reserved names
+        # stay out so they never ride the lane to origin
         addable = [r for r in roots if (root / r).exists()]
         excludes = [f":(exclude)**/{n}" for n in RESERVED_NAMES] + \
             [f":(exclude){r}/locks" for r in addable]
         add = git(root, "add", "-A", "--", ".", *excludes)
         if add.returncode != 0:
-            emit({**plan, "status": "error", "action": "reconcile",
-                  "errors": [f"state checkpoint add failed: "
-                             f"{add.stderr.strip()[:200]}"]}, 2,
-                 args.output)
-        # --no-verify + hooks-off merge: bookkeeping commits shouldn't
-        # pay the repo's ~2min eslint gate twice per event
-        ck = git(root, "commit", "--no-verify", "-qm",
-                 "cdo state: checkpoint — "
-                 + ("org-state + ad-hoc WIP" if adhoc else
-                    "org-state churn") + " ahead of lane advance")
-        checkpoint = git(root, "rev-parse", "HEAD").stdout.strip() \
-            if ck.returncode == 0 else None
+            failure = ({"status": "error", "action": "reconcile",
+                        "errors": [f"state checkpoint add failed: "
+                                   f"{add.stderr.strip()[:200]}"]}, 2)
+        else:
+            # --no-verify + hooks-off merge: bookkeeping commits
+            # shouldn't pay the repo's ~2min eslint gate twice per event
+            ck = git(root, "commit", "--no-verify", "-qm",
+                     "cdo state: checkpoint — org-state churn"
+                     " ahead of lane advance")
+            checkpoint = git(root, "rev-parse", "HEAD").stdout.strip() \
+                if ck.returncode == 0 else None
 
-        with tempfile.TemporaryDirectory(
-                prefix="cdo-hooks-") as hooks_off:
-            mg = git(root, "-c", f"core.hooksPath={hooks_off}",
-                     "merge", "--no-ff", "-m", merge_msg, target)
-        merged = mg.returncode == 0
-        if not merged:
-            conflicts = [l for l in
-                         git(root, "diff", "--name-only",
-                             "--diff-filter=U")
-                         .stdout.splitlines() if l.strip()]
-            bad = [c for c in conflicts if not under_roots(c, roots)]
-            if bad:
-                git(root, "merge", "--abort")
-                emit({**plan, "status": "refused", "action": "reconcile",
-                      "checkpoint": checkpoint, "blocking": blocking,
-                      "errors": ["merge conflicts outside state roots — "
-                                 "aborted; ad-hoc WIP is safe in the "
-                                 "checkpoint commit, reconcile by hand: "
-                                 + ", ".join(bad[:12])]}, 1, args.output)
-            for c in conflicts:
-                git(root, "checkout", "--ours", "--", c)
-                git(root, "add", "--", c)
-            git(root, "commit", "--no-verify", "-qm", merge_msg)
-            merged = not (common / "MERGE_HEAD").exists()
-        if not merged:
-            emit({**plan, "status": "refused", "action": "reconcile",
-                  "checkpoint": checkpoint,
-                  "errors": [(mg.stderr or mg.stdout).strip()[:400]]},
-                 1, args.output)
+            with tempfile.TemporaryDirectory(
+                    prefix="cdo-hooks-") as hooks_off:
+                mg = git(root, "-c", f"core.hooksPath={hooks_off}",
+                         "merge", "--no-ff", "-m", merge_msg, target)
+            merged = mg.returncode == 0
+            if not merged:
+                conflicts = [l for l in
+                             git(root, "diff", "--name-only",
+                                 "--diff-filter=U")
+                             .stdout.splitlines() if l.strip()]
+                bad = [c for c in conflicts
+                       if not under_roots(c, roots)]
+                if bad:
+                    git(root, "merge", "--abort")
+                    failure = (
+                        {"status": "refused", "action": "reconcile",
+                         "checkpoint": checkpoint, "blocking": blocking,
+                         "errors": ["merge conflicts outside state "
+                                    "roots — aborted; ad-hoc WIP "
+                                    "restores from the stash, "
+                                    "reconcile by hand: "
+                                    + ", ".join(bad[:12])]}, 1)
+                else:
+                    for c in conflicts:
+                        git(root, "checkout", "--ours", "--", c)
+                        git(root, "add", "--", c)
+                    git(root, "commit", "--no-verify", "-qm", merge_msg)
+                    merged = not (common / "MERGE_HEAD").exists()
+            if not merged and failure is None:
+                failure = (
+                    {"status": "refused", "action": "reconcile",
+                     "checkpoint": checkpoint,
+                     "errors": [(mg.stderr or mg.stdout).strip()[:400]]},
+                    1)
+
+    # WIP comes home regardless of how the merge went — restored
+    # uncommitted, or kept in the stash with the conflict named
+    pop = _pop_wip(root)
+    if pop:
+        plan["stash_pop"] = pop
+    if failure:
+        emit({**plan, **failure[0]}, failure[1], args.output)
 
     new_head = git(root, "rev-parse", "HEAD").stdout.strip()
     ref_advanced = None

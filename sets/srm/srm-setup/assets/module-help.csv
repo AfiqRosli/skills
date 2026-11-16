@@ -1,7 +1,7 @@
 module,skill,display-name,menu-code,description,action,args,phase,after,before,required,output-location,outputs
 Skills Repo Manager,_meta,,,,,,,,,false,,
 Skills Repo Manager,srm-setup,Module Setup,SU,Installs and configures the Skills Repo Manager module — collects skills repo root and git-pull preference, seeds the sources registry.,setup,,anytime,,,true,,
-Skills Repo Manager,srm-sync,Sync Repos,SY,"Pulls each registered repo (git pull --ff-only, never modifies sources), adapts skills into BMad structure, and materializes them as prefixed skills — then prunes stale mappings.",sync,,anytime,srm-setup:setup,,false,,
+Skills Repo Manager,srm-sync,Sync Repos,SY,"Pulls each registered repo (git pull --ff-only, never modifies sources), clones any not yet checked out (--clone-missing), adapts skills into BMad structure, and materializes them as prefixed skills — then prunes stale mappings.",sync,,anytime,srm-setup:setup,,false,,
 Skills Repo Manager,srm-sync,Add Repo,AR,Registers an external skill repo — auto-detects its layout (grouped BMad module or flat skills dir) and asks what prefix to prepend to mapped skills.,add,[repo-path],anytime,srm-setup:setup,srm-sync:sync,false,,
 Skills Repo Manager,srm-sync,List Sources,LS,Lists registered repos with their prefixes and last-sync status.,list,,anytime,,,false,,
 Skills Repo Manager,srm-sync,Remove Repo,RM,Unregisters a repo and removes its mapped skills from the project.,remove,[repo-name],anytime,,,false,,

@@ -41,6 +41,7 @@ them. Skip the journal only for trivial clarifications.
 ## Escalation
 
 When advice crystallizes into work, offer it — never do it silently:
-"want me to shape this into the platform backlog?" If yes, hand off to this
-dept's intake capability (`shape`/`feed`/`incident` as the table defines).
-The consult stays advisory; the pipeline stays gated.
+"want me to shape this into the platform backlog?" If yes, add a line to
+`{orchestration_dir}/backlogs/platform.md` — it enters intake through
+cdo-align like every backlog item. The consult stays advisory; the
+pipeline stays gated.

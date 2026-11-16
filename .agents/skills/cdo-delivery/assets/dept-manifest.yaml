@@ -1,0 +1,47 @@
+# Department manifest — merged into {orchestration_dir}/capabilities.yaml.
+
+dept: cdo-delivery
+label: Agile Delivery Office
+backlog: delivery         # backlogs/delivery.md
+
+capabilities:
+
+  # build/replan the batch manifest — topo-order the confirmed pool by
+  # backlog deps, write batch.id+manifest+started to the ledger.
+  # FRAGO replans invoke this too.
+  plan:
+    entry: cdo-delivery
+    consumes: confirmed pool + backlog deps
+    produces: ordered manifest in flow-ledger.yaml (manifest.py)
+    delegates-when-installed:
+      - wdl-traction-eos        # cadence + prioritization (rocks)
+      - wdl-team-topologies     # stream-aligned flow design
+
+  # takt metrics — throughput, cycle time, attempt burn, quarantine rate
+  metrics:
+    entry: cdo-delivery
+    consumes: flow-ledger.yaml
+    produces: metrics JSON digest (metrics.py)
+    delegates-when-installed:
+      - wdl-lean-analytics           # which metric matters right now
+      - wdl-high-output-management   # managerial measurement cadence
+      - wdl-traction-eos             # EOS scorecard framing
+
+  # Dispatch target — a confirmed delivery item (process fix, ceremony change,
+  # flow experiment) is work to execute, not just plan.
+  produce:
+    entry: cdo-delivery
+    consumes: confirmed delivery item card
+    produces: executed delivery work + outcome journaled to ledger
+
+  # office-hours — open-ended domain questions; advisory + read-only.
+  # No backlog/pipeline writes — journals to {orchestration_dir}/consult/.
+  consult:
+    entry: cdo-delivery
+    consumes: open question or topic — no backlog item required
+    produces: advice + dated consult note in {orchestration_dir}/consult/delivery.md
+    delegates-when-installed:
+      - wdl-traction-eos
+      - wdl-team-topologies
+      - wdl-lean-analytics
+      - wdl-high-output-management

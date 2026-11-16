@@ -335,6 +335,116 @@ class TestFileCards(unittest.TestCase):
                           (orch / "backlogs" / "code.md")
                           .read_text(encoding="utf-8"))
 
+    def test_mock_staged_and_mock_line_set(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            mock_src = Path(tmp) / "mock.html"
+            mock_src.write_text("<html><body>mock</body></html>",
+                                encoding="utf-8")
+            c = card("S1", 90)
+            c["body"] = ("# card\n## Visual Preview\n\n"
+                         "- **Wireframe:** n/a — no UI surface\n\n"
+                         "## Execution Surface\n\n"
+                         "- **Risk surface:** `none`\n")
+            c["mock"] = str(mock_src)
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            staged = (orch / "alignment" / "drafts" / "assets" / "S1"
+                      / "mock.html")
+            self.assertTrue(staged.is_file())
+            body = (orch / "alignment" / "drafts" / "S1.md") \
+                .read_text(encoding="utf-8")
+            self.assertIn("- **Mock:** alignment/drafts/assets/S1/mock.html",
+                          body)
+            # Mock line lands after the Wireframe line
+            self.assertLess(body.index("**Wireframe:**"),
+                            body.index("**Mock:**"))
+            text = (orch / "alignment-checklist.md").read_text(encoding="utf-8")
+            self.assertIn("| mock: alignment/drafts/assets/S1/mock.html", text)
+
+    def test_mock_replaces_existing_mock_line(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            mock_src = Path(tmp) / "mock.html"
+            mock_src.write_text("<html></html>", encoding="utf-8")
+            c = card("S1", 90)
+            c["body"] = ("# card\n## Visual Preview\n\n"
+                         "- **Wireframe:** https://wiretext.app/w/abc\n"
+                         "- **Mock:** stale/path.html\n\n"
+                         "## Execution Surface\n\n"
+                         "- **Risk surface:** `none`\n")
+            c["mock"] = str(mock_src)
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            body = (orch / "alignment" / "drafts" / "S1.md") \
+                .read_text(encoding="utf-8")
+            self.assertNotIn("stale/path.html", body)
+            self.assertEqual(body.count("**Mock:**"), 1)
+
+    def test_mock_missing_file_warns_and_marks_unavailable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            c = card("S1", 90)
+            c["body"] = ("# card\n## Visual Preview\n\n"
+                         "- **Wireframe:** n/a\n\n"
+                         "## Execution Surface\n\n"
+                         "- **Risk surface:** `none`\n")
+            c["mock"] = str(Path(tmp) / "nope.html")
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue(any("mock" in w for w in data["warnings"]))
+            body = (orch / "alignment" / "drafts" / "S1.md") \
+                .read_text(encoding="utf-8")
+            self.assertIn("unavailable — mock file missing", body)
+            self.assertFalse(
+                (orch / "alignment" / "drafts" / "assets").exists())
+            text = (orch / "alignment-checklist.md").read_text(encoding="utf-8")
+            self.assertNotIn("| mock:", text)
+
+    def test_no_mock_no_mock_segment(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            run_file(orch, [card("S1", 90)])
+            text = (orch / "alignment-checklist.md").read_text(encoding="utf-8")
+            self.assertNotIn("| mock:", text)
+
+    def test_mock_dry_run_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            mock_src = Path(tmp) / "mock.html"
+            mock_src.write_text("<html></html>", encoding="utf-8")
+            c = card("S1", 90)
+            c["mock"] = str(mock_src)
+            proc, data = run_file(orch, [c], ["--dry-run"])
+            self.assertTrue(data["dry_run"])
+            self.assertFalse((orch / "alignment" / "drafts").exists())
+
+    def test_supersede_moves_mock_assets_with_draft(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            mock_src = Path(tmp) / "mock.html"
+            mock_src.write_text("<html>v1</html>", encoding="utf-8")
+            c = card("S1", 95)
+            c["body"] = "# card S1 v1\n"
+            c["mock"] = str(mock_src)
+            run_file(orch, [c])
+            # refile with a changed body and changed mock
+            mock_src.write_text("<html>v2</html>", encoding="utf-8")
+            c2 = card("S1", 60, ["revised"])
+            c2["body"] = "# card S1 v2\n"
+            c2["mock"] = str(mock_src)
+            proc, data = run_file(orch, [c2])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            snaps = list((orch / "alignment" / "superseded").glob("*.assets"))
+            self.assertEqual(len(snaps), 1)
+            self.assertEqual(
+                (snaps[0] / "mock.html").read_text(encoding="utf-8"),
+                "<html>v1</html>")
+            staged = (orch / "alignment" / "drafts" / "assets" / "S1"
+                      / "mock.html")
+            self.assertEqual(staged.read_text(encoding="utf-8"),
+                             "<html>v2</html>")
+
     def test_backlog_marker_flips(self):
         with tempfile.TemporaryDirectory() as tmp:
             orch = self.make_orch(Path(tmp))
@@ -342,6 +452,207 @@ class TestFileCards(unittest.TestCase):
             backlog = (orch / "backlogs" / "code.md").read_text(encoding="utf-8")
             self.assertIn("- [A] S1", backlog)
             self.assertIn("- [ ] S2", backlog)
+
+
+class TestMockStagingEdges(TestFileCards):
+    """Hostile-environment edges on the mock staging contract — the
+    script owns the Mock line, so every divergent input must degrade
+    deterministically rather than desync card, checklist, and disk."""
+
+    def _vp_card(self, key, conf, mock_line=None, terminal=False):
+        """card() plus a Visual Preview section appended LAST — section
+        order is free, and a trailing section exercises the terminal-line
+        insert path. `terminal` drops the final newline."""
+        c = card(key, conf)
+        vp = ("\n## Visual Preview\n\n"
+              "- **Wireframe:** https://wiretext.app/w/abc\n")
+        if mock_line is not None:
+            vp += f"- **Mock:** {mock_line}\n"
+        body = c["body"] + vp
+        c["body"] = body.rstrip("\n") if terminal else body
+        return c
+
+    def test_mock_directory_stages_as_dir(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            mockdir = Path(tmp) / "mocks"
+            mockdir.mkdir()
+            (mockdir / "list.html").write_text(
+                "<html><body>list</body></html>", encoding="utf-8")
+            (mockdir / "detail.html").write_text(
+                "<html><body>detail</body></html>", encoding="utf-8")
+            c = self._vp_card("S1", 95)
+            c["mock"] = str(mockdir)
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            staged = (orch / "alignment" / "drafts" / "assets" / "S1"
+                      / "mock")
+            self.assertTrue((staged / "list.html").is_file())
+            self.assertTrue((staged / "detail.html").is_file())
+            body = (orch / "alignment" / "drafts" / "S1.md").read_text(
+                encoding="utf-8")
+            self.assertIn(
+                "- **Mock:** alignment/drafts/assets/S1/mock/", body)
+
+    def test_mock_self_copy_doesnt_crash(self):
+        """Prompt layer stages the mock at the dest path itself and passes
+        it — self-copy must be a no-op, never a mid-drain crash."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            dest = (orch / "alignment" / "drafts" / "assets" / "S1"
+                    / "mock.html")
+            dest.parent.mkdir(parents=True)
+            dest.write_text("<html><body>already</body></html>",
+                            encoding="utf-8")
+            c = self._vp_card("S1", 95)
+            c["mock"] = str(dest)
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            body = (orch / "alignment" / "drafts" / "S1.md").read_text(
+                encoding="utf-8")
+            self.assertIn(
+                "- **Mock:** alignment/drafts/assets/S1/mock.html", body)
+
+    def test_relative_mock_anchors_to_cards_dir(self):
+        """A relative `mock` resolves against the cards.json directory —
+        not the process CWD the script happened to launch from."""
+        with tempfile.TemporaryDirectory() as tmp, \
+                tempfile.TemporaryDirectory() as cdir:
+            orch = self.make_orch(Path(tmp))
+            mock_file = Path(cdir) / "mock.html"
+            mock_file.write_text(
+                "<html><body>" + "x" * 300 + "</body></html>",
+                encoding="utf-8")
+            c = self._vp_card("S1", 95)
+            c["mock"] = "mock.html"
+            cpath = Path(cdir) / "cards.json"
+            cpath.write_text(json.dumps([c]), encoding="utf-8")
+            proc = subprocess.run(
+                [sys.executable, str(SCRIPT), "--orchestration-dir",
+                 str(orch), "--cards", str(cpath)],
+                capture_output=True, text=True, cwd=tmp)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue(
+                (orch / "alignment" / "drafts" / "assets" / "S1"
+                 / "mock.html").is_file())
+
+    def test_declared_mock_not_staged_degrades(self):
+        """Card claims a mock path but the payload supplies none — the
+        claim is existence-checked and degraded, never trusted."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            c = self._vp_card(
+                "S1", 95,
+                mock_line="alignment/drafts/assets/S1/mock.html")
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue(any("no mock was staged" in w
+                                for w in data["warnings"]))
+            body = (orch / "alignment" / "drafts" / "S1.md").read_text(
+                encoding="utf-8")
+            self.assertIn(
+                "unavailable — mock declared but not staged", body)
+
+    def test_declared_mock_already_staged_passes(self):
+        """Claim + real file on disk (pre-staged) → line kept, no warn."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            dest = (orch / "alignment" / "drafts" / "assets" / "S1"
+                    / "mock.html")
+            dest.parent.mkdir(parents=True)
+            dest.write_text("<html></html>", encoding="utf-8")
+            c = self._vp_card(
+                "S1", 95,
+                mock_line="alignment/drafts/assets/S1/mock.html")
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertFalse(any("declared but not staged" in w
+                                 for w in data.get("warnings", [])))
+            text = (orch / "alignment-checklist.md").read_text(
+                encoding="utf-8")
+            self.assertIn(
+                "| mock: alignment/drafts/assets/S1/mock.html", text)
+
+    def test_placeholder_mock_flags_ungrounded(self):
+        """Placeholder styling must surface as a flag — a quiet
+        placeholder that routes Routine defeats the flag's purpose."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            mock_src = Path(tmp) / "mock.html"
+            mock_src.write_text(
+                "<!-- placeholder styling — no design tokens found -->\n"
+                + "<html><body>" + "x" * 300 + "</body></html>",
+                encoding="utf-8")
+            c = self._vp_card("S1", 95)
+            c["mock"] = str(mock_src)
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue(any("ungrounded:design-tokens" in w
+                                for w in data["warnings"]))
+            text = (orch / "alignment-checklist.md").read_text(
+                encoding="utf-8")
+            self.assertIn("ungrounded:design-tokens", text)
+
+    def test_external_refs_warn(self):
+        """A mock full of CDN links violates the file contract — warn,
+        never block."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            mock_src = Path(tmp) / "mock.html"
+            mock_src.write_text(
+                "<html><head>"
+                '<link href="https://cdn.example.com/x.css" '
+                'rel="stylesheet"></head><body>'
+                + "x" * 300 + "</body></html>",
+                encoding="utf-8")
+            c = self._vp_card("S1", 95)
+            c["mock"] = str(mock_src)
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue(any("external assets" in w
+                                for w in data["warnings"]))
+
+    def test_terminal_wireframe_line_no_crash(self):
+        """Wireframe as the body's last line with no trailing newline —
+        the Mock insert must not crash mid-drain."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            mock_src = Path(tmp) / "mock.html"
+            mock_src.write_text("<html><body>" + "x" * 300 +
+                                "</body></html>", encoding="utf-8")
+            c = self._vp_card("S1", 95, terminal=True)
+            c["mock"] = str(mock_src)
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            body = (orch / "alignment" / "drafts" / "S1.md").read_text(
+                encoding="utf-8")
+            self.assertIn(
+                "- **Mock:** alignment/drafts/assets/S1/mock.html", body)
+
+    def test_parked_assets_supersede_with_card(self):
+        """A fresh draft supersedes a parked card — its parked mock
+        assets ride along, and the superseded card's Mock line is
+        retargeted instead of left citing parked/."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = self.make_orch(Path(tmp))
+            pdir = orch / "alignment" / "parked"
+            (pdir / "assets" / "S2").mkdir(parents=True)
+            (pdir / "assets" / "S2" / "mock.html").write_text(
+                "<html>parked</html>", encoding="utf-8")
+            (pdir / "S2.md").write_text(
+                "# card\n## Visual Preview\n\n"
+                "- **Wireframe:** https://wiretext.app/w/abc\n"
+                "- **Mock:** alignment/parked/assets/S2/mock.html\n",
+                encoding="utf-8")
+            proc, data = run_file(orch, [card("S2", 90)])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            snaps = list((orch / "alignment" / "superseded")
+                         .glob("S2.*.parked.assets/mock.html"))
+            self.assertEqual(len(snaps), 1)
+            card_snap = next((orch / "alignment" / "superseded")
+                             .glob("S2.*.parked.md"))
+            self.assertIn("superseded/S2.", card_snap.read_text(
+                encoding="utf-8"))
 
 
 if __name__ == "__main__":

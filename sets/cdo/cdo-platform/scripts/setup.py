@@ -7,9 +7,13 @@
 
 Usage:
   uv run setup.py --project-root /path/to/project [--orchestration-dir PATH]
-      [--assets-dir PATH] [-o result.json]
+      [--assets-dir PATH] [--check] [-o result.json]
 
-Exit codes: 0=installed, 1=prereq missing, 2=runtime error
+`--check` is the no-op probe the activation step runs — reports
+{registered} from capabilities.yaml without writing anything.
+
+Exit codes: 0=installed/registered, 1=prereq missing/unregistered,
+2=runtime error
 """
 
 import argparse
@@ -49,6 +53,9 @@ def parse_args():
                    default=str(Path(__file__).parent.parent / "assets"))
     p.add_argument("--skill-dirs", default=".agents/skills,.devin/skills",
                    help="comma-separated dirs to probe for delegate skills")
+    p.add_argument("--check", action="store_true",
+                   help="no-op probe — report {registered} from "
+                        "capabilities.yaml, write nothing")
     p.add_argument("-o", "--output")
     return p.parse_args()
 
@@ -68,6 +75,15 @@ def main():
     orch = Path(args.orchestration_dir).resolve() if args.orchestration_dir \
         else root / "docs" / "orchestration"
     assets = Path(args.assets_dir)
+
+    if args.check:
+        caps_path = orch / "capabilities.yaml"
+        caps = yaml.safe_load(caps_path.read_text(encoding="utf-8")) or {} \
+            if caps_path.is_file() else {}
+        registered = DEPT in (caps.get("departments") or {})
+        emit({"status": "ok" if registered else "unregistered",
+              "dept": DEPT, "registered": registered},
+             0 if registered else 1, args.output)
 
     if not orch.is_dir():
         emit({"status": "blocked",

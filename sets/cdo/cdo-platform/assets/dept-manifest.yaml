@@ -43,6 +43,18 @@ capabilities:
     delegates-when-installed:
       - wdl-release-it    # stability/antifragility patterns for the revert plan
 
+  # sprint-boundary migration — the OTHER half of release bookkeeping.
+  # An Operator "start a new sprint" directive partitions non-done stories
+  # into the new sprint's artifacts (epics doc, sprint yaml, spec folder)
+  # and archives the old ones. Deploys never trigger it — mid-sprint
+  # deploys are cdo-version-change-for-production's job.
+  version-upgrade:
+    entry: cdo-platform
+    consumes: Operator sprint-start directive + release-train.json + sprint artifacts
+    produces: migrated sprint-status-*.yaml + epics-beta-*.md + spec folder
+    delegates-when-installed:
+      - cdo-version-upgrade   # the migration workflow — this capability IS the delegation
+
   # Dispatch target — a confirmed platform item (env fix, deploy hardening,
   # infra task) is work to execute within the item's own authority lane.
   produce:

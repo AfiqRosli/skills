@@ -12,7 +12,7 @@ Usage:
       [-o digest.json]
 
 Emits JSON: {key, resolved_key, ledger: {...}, card_path, card_status, card_body,
-card: {declared, unknown_tokens, wireframe, wireframe_status},
+card: {declared, unknown_tokens, wireframe, wireframe_status, mock, mock_status},
 backlog: {file, line}, signals: [...]} — None for anything absent.
 Consumers judge; this script fetches.
 
@@ -25,8 +25,9 @@ card_status: draft (under alignment/drafts/) | confirmed (dated archive,
 no reject head) | rejected (archive opens <!-- reject) | absent.
 Only `confirmed` authorizes card-covered bypasses — everything else is
 unsigned. declared[] is parsed only from the `## Execution Surface`
-section's `- **Risk surface:**` line; wireframe only from `## Visual
-Preview`. Section-scoped: token prose elsewhere in the card never counts.
+section's `- **Risk surface:**` line; wireframe and mock only from
+`## Visual Preview`. Section-scoped: token prose elsewhere in the card
+never counts.
 
 Exit codes: 0=resolved, 1=key not found anywhere, 2=runtime error
 """
@@ -43,33 +44,24 @@ except ImportError:
     print("error: pyyaml is required (PEP 723 dependency)", file=sys.stderr)
     sys.exit(2)
 
+from cardlayout import (  # noqa: E402 — vendored card-layout contract
+    MOCK_VALUE_RE, RISK_TOKENS, WIREFRAME_VALUE_RE, section)
 
-# Gate-bypass tokens (only these authorize card-covered bypass):
-#   schema-migration, deps-changed
-# Attention-only tokens (declared = Needs Attention routing; no bypass):
-#   env-changed, api-contract, data-backfill
-RISK_TOKENS = {"none", "schema-migration", "deps-changed",
-               "env-changed", "api-contract", "data-backfill"}
+# Gate-bypass tokens live in cardlayout.RISK_TOKENS (only
+# schema-migration/deps-changed authorize card-covered bypass; the rest
+# are attention-only routing).
 WIRETEXT_RE = re.compile(r"https://wiretext\.app/w/[A-Za-z0-9_-]+")
 REJECT_HEAD_RE = re.compile(r"^\s*<!--\s*reject", re.M)
 BACKLOG_ITEM_RE = re.compile(r"^- \[.\] (\S+)")
-SECTION_RE = re.compile(r"^## ", re.M)
+# a value that walks like a path — separators or an .html suffix; anything
+# else unrecognized is `unknown`, never silently `path`
+_PATHISH_RE = re.compile(r"[/\\]|\.html?$", re.I)
 
 
-def _section(body: str, name: str) -> str:
-    """Return the body of a '## name' section (up to the next '## ')."""
-    m = re.search(rf"^## {re.escape(name)}\s*$", body, flags=re.M)
-    if not m:
-        return ""
-    rest = body[m.end():]
-    nxt = SECTION_RE.search(rest)
-    return rest[:nxt.start()] if nxt else rest
-
-
-def _parse_card(body: str) -> dict:
+def _parse_card(body: str, orch: Path = None) -> dict:
     """Extract the machine-checkable fields from a card body — section-scoped
     so prose mentions elsewhere never read as declarations."""
-    surf = _section(body, "Execution Surface")
+    surf = section(body, "Execution Surface")
     tokens, unknown = [], []
     m = re.search(r"- \*\*Risk surface:\*\*\s*(.+)", surf)
     if m:
@@ -81,18 +73,47 @@ def _parse_card(body: str) -> dict:
     if "none" in tokens:
         tokens = [t for t in tokens if t != "none"]
 
-    vp = _section(body, "Visual Preview")
+    vp = section(body, "Visual Preview")
+    # URL recovery stays section-scoped (a wiretext URL is unambiguous);
+    # status sentinels are LINE-scoped to the Wireframe line itself — a
+    # Mock line's `n/a`/`unavailable` must never bleed into the wire's
+    # status.
     wm = WIRETEXT_RE.search(vp)
     if wm:
         wstatus, wire = "url", wm.group(0)
-    elif re.search(r"no UI surface", vp):
-        wstatus, wire = "no-ui-surface", None
-    elif re.search(r"unavailable", vp):
-        wstatus, wire = "unavailable", None
     else:
-        wstatus, wire = "absent", None
+        wl = WIREFRAME_VALUE_RE.search(vp)
+        wval = wl.group(1).strip().strip("`") if wl else ""
+        if wval.startswith("n/a"):
+            wstatus, wire = "no-ui-surface", None
+        elif wval.startswith("unavailable"):
+            wstatus, wire = "unavailable", None
+        elif wval:
+            wstatus, wire = "unknown", None
+        else:
+            wstatus, wire = "absent", None
+
+    # the design-mock line — same section scope, writer-anchored regex.
+    # `path` is only reported when the cited file/dir actually exists —
+    # a claimed path that resolves to nothing is `dead-link`, not `path`.
+    mm = MOCK_VALUE_RE.search(vp)
+    if mm:
+        mval = mm.group(1).strip().strip("`")
+        if mval.startswith("n/a"):
+            mstatus, mock = "no-ui-surface", None
+        elif mval.startswith("unavailable"):
+            mstatus, mock = "unavailable", None
+        elif orch is not None and (orch / mval).exists():
+            mstatus, mock = "path", mval
+        elif _PATHISH_RE.search(mval):
+            mstatus, mock = "dead-link", mval
+        else:
+            mstatus, mock = "unknown", mval
+    else:
+        mstatus, mock = "absent", None
     return {"declared": tokens, "unknown_tokens": unknown,
-            "wireframe": wire, "wireframe_status": wstatus}
+            "wireframe": wire, "wireframe_status": wstatus,
+            "mock": mock, "mock_status": mstatus}
 
 
 def _card_status(orch: Path, card: Path, body: str) -> str:
@@ -152,7 +173,7 @@ def _resolve(orch: Path, key: str, digest: dict):
         digest["card_path"] = str(card.relative_to(orch)).replace("\\", "/")
         digest["card_body"] = body
         digest["card_status"] = _card_status(orch, card, body)
-        digest["card"] = _parse_card(body)
+        digest["card"] = _parse_card(body, orch)
         digest["found"] = True
 
     # backlog line — token-boundary key match across all backlogs

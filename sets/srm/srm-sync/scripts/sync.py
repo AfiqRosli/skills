@@ -11,11 +11,13 @@ Never modifies source repos. The only ops run on a source are `git clone`
 
 Commands:
   sync    Materialize all (or one) registered repos into the skills dir.
+          --clone-missing fetches registered repos that aren't checked out.
   detect  Inspect a repo path and print suggested registry entry as JSON.
   clone   Clone a remote URL into skills_repo_root/<owner>/<repo>.
   add     Append a repo entry to the registry (prefix must be given).
   remove  Drop a repo from the registry; with --delete-skills also removes its skills.
   list    Print the registry.
+  missing Report which registered repos are/aren't checked out (read-only).
   status  Report freshness of mapped skills vs their source commit.
 
 All commands print a JSON result to stdout. Non-zero exit = fatal error.
@@ -481,14 +483,14 @@ GIT_URL_RE = re.compile(
 )
 
 
-def cmd_clone(args, vars_):
+def clone_into(url, vars_):
     """Clone a remote repo into <skills_repo_root>/<owner>/<repo>.
 
     Returns the registry-form path (with the literal {skills_repo_root} token)
     so `detect`/`add` can be fed straight from this output. Never overwrites an
     existing checkout — reports `exists` instead.
     """
-    url = (args.url or "").strip()
+    url = (url or "").strip()
     m = GIT_URL_RE.match(url)
     if not m:
         return {"status": "error",
@@ -515,6 +517,10 @@ def cmd_clone(args, vars_):
                 "stderr": (r.stderr or "")[-500:]}
     return {"status": "cloned", "path": reg_rel,
             "resolved": str(target), "name": repo, "url": url}
+
+
+def cmd_clone(args, vars_):
+    return clone_into(args.url, vars_)
 
 
 def cmd_add(args, reg_path):
@@ -573,15 +579,38 @@ def cmd_sync(args, reg_path, skills_dir, project_root, vars_):
         if not r:
             return {"status": "error", "message": f"repo '{args.repo}' not in registry"}
         repos = [r]
-    report = {"status": "ok", "repos": {}, "mapped": [], "skipped": [], "warnings": []}
+    report = {"status": "ok", "repos": {}, "mapped": [], "skipped": [], "warnings": [], "missing": []}
     for repo in repos:
         rroot = Path(resolve(repo["path"], vars_))
         rrep = {"path": str(rroot), "pulled": None, "commit": None, "mapped": 0}
         if not rroot.is_dir():
-            rrep["error"] = "path not found"
-            report["repos"][repo["name"]] = rrep
-            report["warnings"].append(f"{repo['name']}: {rroot} not found")
-            continue
+            missing = {"name": repo["name"], "path": str(rroot), "url": repo.get("url", "")}
+            if args.clone_missing and repo.get("url"):
+                cl = clone_into(repo["url"], vars_)
+                if cl["status"] == "error":
+                    rrep["error"] = cl["message"]
+                    missing["reason"] = "clone failed"
+                    missing["error"] = cl["message"]
+                    report["repos"][repo["name"]] = rrep
+                    report["missing"].append(missing)
+                    report["warnings"].append(f"{repo['name']}: clone failed — {cl['message']}")
+                    continue
+                rrep["cloned"] = cl["status"]
+                if Path(cl["resolved"]) != rroot:
+                    rrep["path_repointed"] = {"from": str(rroot), "to": cl["resolved"]}
+                    repo["path"] = cl["path"]
+                    save_yaml(reg_path, data)
+                    rrep["path"] = cl["resolved"]
+                rroot = Path(cl["resolved"])
+            else:
+                rrep["error"] = "path not found"
+                missing["reason"] = "not cloned"
+                report["repos"][repo["name"]] = rrep
+                report["missing"].append(missing)
+                report["warnings"].append(
+                    f"{repo['name']}: {rroot} not found"
+                    + ("" if repo.get("url") else " (no url — cannot clone)"))
+                continue
         if repo.get("git_pull", True) and vars_["git_pull"] and not args.no_pull and is_git_repo(rroot):
             rc, out, err = git(rroot, "pull", "--ff-only")
             rrep["pulled"] = {"rc": rc, "out": out[-300:], "err": err[-300:]}
@@ -638,6 +667,23 @@ def cmd_sync(args, reg_path, skills_dir, project_root, vars_):
     return report
 
 
+def cmd_missing(reg_path, vars_):
+    """Read-only clone-status check: which registered repos are/aren't checked
+    out. No pulls, no writes — used by srm-setup and by humans before sync."""
+    data = registry_load(reg_path)
+    cloned, missing = [], []
+    for repo in data["repos"]:
+        rroot = Path(resolve(repo["path"], vars_))
+        if rroot.is_dir():
+            cloned.append({"name": repo["name"], "path": str(rroot)})
+        else:
+            missing.append({"name": repo["name"], "path": str(rroot),
+                            "url": repo.get("url", "")})
+    return {"status": "ok", "cloned": cloned, "missing": missing,
+            "counts": {"cloned": len(cloned), "missing": len(missing),
+                       "total": len(cloned) + len(missing)}}
+
+
 def cmd_status(reg_path, skills_dir, vars_):
     data = registry_load(reg_path)
     rows = []
@@ -662,7 +708,7 @@ def cmd_status(reg_path, skills_dir, vars_):
 
 def main():
     ap = argparse.ArgumentParser(prog="srm-sync")
-    ap.add_argument("command", choices=["sync", "detect", "clone", "add", "remove", "list", "status"])
+    ap.add_argument("command", choices=["sync", "detect", "clone", "add", "remove", "list", "missing", "status"])
     ap.add_argument("--registry", required=False)
     ap.add_argument("--skills-dir", required=False)
     ap.add_argument("--config-root", default=".", help="project root (for _bmad/config.yaml)")
@@ -674,6 +720,8 @@ def main():
     ap.add_argument("--layout", default="flat", choices=["flat", "grouped", "auto"])
     ap.add_argument("--skills-paths", default="")
     ap.add_argument("--no-pull", action="store_true")
+    ap.add_argument("--clone-missing", action="store_true",
+                    help="clone registered repos not yet checked out (uses each entry's url)")
     ap.add_argument("--prune", action="store_true")
     ap.add_argument("--delete-skills", action="store_true")
     args = ap.parse_args()
@@ -693,6 +741,8 @@ def main():
         out = cmd_remove(args, reg_path, skills_dir)
     elif args.command == "list":
         out = cmd_list(reg_path)
+    elif args.command == "missing":
+        out = cmd_missing(reg_path, vars_)
     elif args.command == "status":
         out = cmd_status(reg_path, skills_dir, vars_)
     else:

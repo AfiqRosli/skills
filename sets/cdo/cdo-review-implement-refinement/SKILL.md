@@ -323,6 +323,8 @@ When findings from code review are related across files:
 
 ### Style Guide Reference (16 Documents)
 
+**Location:** the guides are passive reference docs at `docs/rules/` in the target project — resolve the path via the project's `AGENTS.md` pointer if it differs. Filenames below are relative to that directory.
+
 **Core Development Guides:**
 1. **`code-style-guide.md`** - Main overview with links to all guides
 2. **`code-style-guide-vuejs-patterns.md`** - Vue 3 component structure and patterns

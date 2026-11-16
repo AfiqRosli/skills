@@ -1,0 +1,76 @@
+# srm sources registry — external skill repos mapped into .agents/skills/
+# Manage via the srm-sync skill (add / remove / list / sync); edit by hand only
+# if you know the schema (see srm-sync/references/adaptation.md).
+#
+#   name          display name — also the module label in module-help.csv
+#   url           informational clone URL
+#   path          repo location; may use {skills_repo_root} or {project-root}
+#   prefix        prepended to every mapped skill (user-chosen at add time)
+#   layout        grouped = each skills_path is a BMad module dir
+#                 flat    = each skills_path is a dir of */SKILL.md skills
+#   git_pull      run `git pull --ff-only` before mapping (also gated by the
+#                 srm.git_pull config value and --no-pull)
+#   skills_paths  repo-relative paths to scan
+#
+# Prefixes below are suggestions — nothing is mapped until srm-sync runs.
+# To override a prefix, edit `prefix:` here (or `srm-sync remove` + `add`
+# with a new prefix) BEFORE the first sync.
+
+repos:
+  - name: BMAD-CYBERSEC
+    url: https://github.com/BlackUnicornSecurity/BMAD-CYBERSEC.git
+    path: "{skills_repo_root}/BlackUnicornSecurity/BMAD-CYBERSEC"
+    prefix: bmad-bus
+    layout: grouped
+    git_pull: true
+    skills_paths:
+      - src/core
+      - src/cybersec-team
+      - src/intel-team
+      - src/legal-team
+      - src/strategy-team
+
+  - name: emilkowalski/skills
+    url: https://github.com/emilkowalski/skills.git
+    path: "{skills_repo_root}/emilkowalski/skills"
+    prefix: emilkowalski
+    layout: flat
+    git_pull: true
+    skills_paths:
+      - skills
+
+  - name: Leonxlnx/taste-skill
+    url: https://github.com/Leonxlnx/taste-skill.git
+    path: "{skills_repo_root}/Leonxlnx/taste-skill"
+    prefix: leonxlnx
+    layout: flat
+    git_pull: true
+    skills_paths:
+      - skills
+
+  - name: pbakaus/impeccable
+    url: https://github.com/pbakaus/impeccable.git
+    path: "{skills_repo_root}/pbakaus/impeccable"
+    prefix: pbakaus
+    layout: flat
+    git_pull: true
+    skills_paths:
+      - .agents/skills
+
+  - name: scaccogatto/minimalist-entrepreneur
+    url: https://github.com/scaccogatto/minimalist-entrepreneur.git
+    path: "{skills_repo_root}/scaccogatto/minimalist-entrepreneur"
+    prefix: scaccogatto
+    layout: flat
+    git_pull: true
+    skills_paths:
+      - skills
+
+  - name: wondelai/skills
+    url: https://github.com/wondelai/skills.git
+    path: "{skills_repo_root}/wondelai/skills"
+    prefix: wondelai
+    layout: flat
+    git_pull: true
+    skills_paths:
+      - .agents/skills

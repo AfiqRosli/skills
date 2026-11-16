@@ -1,0 +1,107 @@
+{
+  "scanner": "prompt-metrics-prepass",
+  "script": "prepass-prompt-metrics.py",
+  "version": "2.0.0",
+  "skill_path": "sets\\srm\\srm-sync",
+  "timestamp": "2026-11-16T13:56:08.825684+00:00",
+  "budgets": {
+    "skill_md_tokens": [
+      1500,
+      2500
+    ],
+    "multi_branch_reference_tokens": 4500,
+    "single_purpose_reference_tokens": 9000
+  },
+  "skill_md": {
+    "tokens": 1804,
+    "token_method": "tiktoken",
+    "section_count": 9,
+    "frontmatter": {
+      "name": "srm-sync",
+      "description": "Syncs external skill repos into the project as prefixed, BMad-structured skills. Use when the user wants to 'sync skills', 'add an external repo', 'map a skill repo', 'list imported sources', or 'remove a mapped repo'.",
+      "description_chars": 218,
+      "description_has_angle_brackets": false,
+      "keys": [
+        "description",
+        "name"
+      ]
+    }
+  },
+  "aggregate": {
+    "total_files_scanned": 1,
+    "total_tokens": 1804,
+    "total_waste_patterns": 0,
+    "total_back_references": 0,
+    "files_with_numbered_prefix": 0
+  },
+  "reference_sizes": {
+    "adaptation.md": {
+      "tokens": 1170,
+      "token_method": "tiktoken",
+      "numbered_prefix_filename": false
+    }
+  },
+  "files": [
+    {
+      "file": "SKILL.md",
+      "tokens": 1804,
+      "token_method": "tiktoken",
+      "sections": [
+        {
+          "level": 2,
+          "title": "Overview"
+        },
+        {
+          "level": 2,
+          "title": "On Activation"
+        },
+        {
+          "level": 2,
+          "title": "Actions"
+        },
+        {
+          "level": 3,
+          "title": "sync"
+        },
+        {
+          "level": 3,
+          "title": "add"
+        },
+        {
+          "level": 3,
+          "title": "remove"
+        },
+        {
+          "level": 3,
+          "title": "list"
+        },
+        {
+          "level": 3,
+          "title": "status"
+        },
+        {
+          "level": 2,
+          "title": "What the script does (reference)"
+        }
+      ],
+      "table_count": 1,
+      "table_rows": 7,
+      "fenced_block_count": 6,
+      "allcaps_directive_count": 0,
+      "numbered_prefix_filename": false,
+      "waste_patterns": [],
+      "back_references": [],
+      "frontmatter": {
+        "name": "srm-sync",
+        "description": "Syncs external skill repos into the project as prefixed, BMad-structured skills. Use when the user wants to 'sync skills', 'add an external repo', 'map a skill repo', 'list imported sources', or 'remove a mapped repo'.",
+        "description_chars": 218,
+        "description_has_angle_brackets": false,
+        "keys": [
+          "description",
+          "name"
+        ]
+      },
+      "is_skill_md": true
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "scanner": "path-standards",
+  "script": "scan-path-standards.py",
+  "version": "3.0.0",
+  "skill_path": "sets\\srm\\srm-setup",
+  "timestamp": "2026-11-16T13:56:11.004165+00:00",
+  "files_scanned": [
+    "SKILL.md"
+  ],
+  "status": "fail",
+  "findings": [
+    {
+      "file": "SKILL.md",
+      "line": 45,
+      "severity": "high",
+      "category": "absolute-path",
+      "title": "Absolute path found \u2014 not portable across machines",
+      "detail": "In the commands below, replace `{project-root}` in every path argument with the actual project root (e.g. `/home/me/myap",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 10,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "Installs and configures a BMad module into a project. Module identity (name, code, version) comes from `./assets/module.",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 13,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "- **`{project-root}/_bmad/config.user.yaml`** \u2014 personal settings intended to be gitignored: `user_name`, `communication",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 22,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "1. Read `./assets/module.yaml` for module metadata and variable definitions (the `code` field is the module identifier)",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 35,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "**Default priority** (highest wins): existing new config values > legacy config values > `./assets/module.yaml` defaults",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 39,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "**Module config**: Read each variable in `./assets/module.yaml` that has a `prompt` field. Ask using that prompt with it",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 54,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "Run `./scripts/merge-config.py --help` or `./scripts/merge-help-csv.py --help` for full usage.",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 54,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "Run `./scripts/merge-config.py --help` or `./scripts/merge-help-csv.py --help` for full usage.",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 62,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "After config is written, create `{project-root}/_bmad/srm/` and seed the sources registry. If `{project-root}/_bmad/srm/",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 82,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "Check `directories_removed` and `files_removed_count` in the JSON output for the confirmation step. Run `./scripts/clean",
+      "action": ""
+    },
+    {
+      "file": "SKILL.md",
+      "line": 86,
+      "severity": "high",
+      "category": "cross-dir-dot-slash",
+      "title": "Cross-directory ./ reference \u2014 ./ means same folder only; use bare skill-root relative path (e.g., references/foo.md not ./references/foo.md)",
+      "detail": "Use the script JSON output to display what was written \u2014 config values set (written to `config.yaml` at root for core, m",
+      "action": ""
+    }
+  ],
+  "assessments": {},
+  "summary": {
+    "total_findings": 11,
+    "by_severity": {
+      "critical": 0,
+      "high": 11,
+      "medium": 0,
+      "low": 0
+    },
+    "by_category": {
+      "double_prefix": 0,
+      "bare_bmad": 0,
+      "absolute_path": 1,
+      "relative_prefix": 0,
+      "cross_dir_dot_slash": 10,
+      "frontmatter": 0,
+      "structure": 0
+    },
+    "assessment": "Path standards scan complete"
+  }
+}

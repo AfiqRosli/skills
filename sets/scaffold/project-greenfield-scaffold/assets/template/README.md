@@ -38,4 +38,5 @@ bun run db:migrate  # apply migrations
   without `/api` — registered in `server/api.ts`.
 - Types: `interfaces/`, shared utilities `utils/`, server logic
   `server/lib/`, schema `server/db/schema.ts`.
-- Code style rules: `.devin/rules/` (read `code-style-guide.md` first).
+- Code style rules: `docs/rules/` (read `code-style-guide.md` first;
+  `AGENTS.md` carries the pointer).

@@ -31,6 +31,7 @@ What "the house stack" actually is — distilled from a production codebase and 
 ## Directory map
 
 ```
+AGENTS.md             agent instructions — always-on pointer to the style guide
 app.vue  auth.ts  auth-schema.ts  drizzle.config.ts  eslint.config.ts
 netlify.toml  nuxt.config.ts  playwright.config.ts  vitest.config.ts
 assets/styles/      global.scss, settings.scss
@@ -49,7 +50,7 @@ server/             api.ts, errors.ts, <domain>.ts routers, db/, lib/, middlewar
 stores/             Pinia stores — one per domain
 tests/              vitest specs + e2e/
 utils/              logger.ts, error-handlers.ts, email.ts …
-.devin/rules/       the code-style-guide set (16 files)
+docs/rules/           the code-style-guide set (16 files, passive reference docs)
 ```
 
 ## Invariants — don't break these when adapting

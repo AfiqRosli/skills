@@ -19,7 +19,8 @@ Call from the context whose HEAD should land:
           [--to refs/heads/cdo-lane] [--reconcile] [--dry-run]
 
   --reconcile is forwarded to advance-lane.py — drain-end sweeps pass it
-  so org-state churn doesn't leave the mirror stale.
+  so org-state churn doesn't leave the mirror stale and ad-hoc Operator
+  WIP on the checkout stashes aside + pops back instead of blocking.
 
 Output JSON: status landed | already-abreast | blocked | error —
   blocked means a sibling moved the lane twice (or rebase failed): the
@@ -94,6 +95,29 @@ def advance(root: Path, lane: str, target: str, reconcile: bool) -> dict:
                 "raw": (proc.stdout or proc.stderr)[:200]}
 
 
+def advance_warnings(adv: dict) -> list:
+    """Warnings an advance result is carrying: a refused converge, or a
+    WIP stash pop that needs the Operator's hands (conflicts kept the
+    stash — never silently dropped)."""
+    warnings = []
+    if adv.get("status") not in \
+            ("advanced", "already-abreast", "reconciled"):
+        warnings.append(
+            "lane advance refused: " + "; ".join(
+                adv.get("errors", [adv.get("status", "?")])[:2]))
+    pop = adv.get("stash_pop") or {}
+    if pop.get("status") == "conflicts":
+        warnings.append(
+            "ad-hoc WIP stash pop conflicted on "
+            + ", ".join(pop.get("files") or ["(see stash)"])
+            + f" — WIP kept in {pop.get('ref', 'stash')}, resolve by hand")
+    elif pop.get("status") == "deferred":
+        warnings.append(
+            "ad-hoc WIP stayed stashed (merge unresolved): "
+            + pop.get("ref", "stash"))
+    return warnings
+
+
 def main():
     args = parse_args()
     root = Path(args.project_root).resolve()
@@ -130,14 +154,8 @@ def main():
         # already on the lane — still advance: a stale {lane} mirror
         # (missed/failed earlier advance) heals here, not nowhere
         adv = advance(root, args.lane, args.to, args.reconcile)
-        warnings = []
-        if adv.get("status") not in \
-                ("advanced", "already-abreast", "reconciled"):
-            warnings.append(
-                "lane advance refused: " + "; ".join(
-                    adv.get("errors", [adv.get("status", "?")])[:2]))
         emit({**plan, "status": "already-abreast", "advance": adv,
-              "warnings": warnings}, 0, args.output)
+              "warnings": advance_warnings(adv)}, 0, args.output)
     if args.dry_run:
         stale = bool(tip) and not is_ancestor(work, tip, ship)
         emit({**plan, "status": "dry-run",
@@ -164,14 +182,9 @@ def main():
             if not tip else git(root, "update-ref", args.to, ship, tip)
         if cas.returncode == 0:
             adv = advance(root, args.lane, args.to, args.reconcile)
-            warnings = []
-            if adv.get("status") not in \
-                    ("advanced", "already-abreast", "reconciled"):
-                warnings.append(
-                    "lane advance refused: " + "; ".join(
-                        adv.get("errors", [adv.get("status", "?")])[:2]))
             emit({**plan, "status": "landed", "lane_sha": ship,
-                  "advance": adv, "warnings": warnings}, 0, args.output)
+                  "advance": adv,
+                  "warnings": advance_warnings(adv)}, 0, args.output)
         tip = resolve(root, args.to) or tip
         plan["retries"] = attempt + 1
 

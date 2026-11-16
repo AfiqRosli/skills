@@ -1,0 +1,101 @@
+{
+  "scanner": "prompt-metrics-prepass",
+  "script": "prepass-prompt-metrics.py",
+  "version": "2.0.0",
+  "skill_path": "sets\\srm\\srm-setup",
+  "timestamp": "2026-11-16T13:56:09.388668+00:00",
+  "budgets": {
+    "skill_md_tokens": [
+      1500,
+      2500
+    ],
+    "multi_branch_reference_tokens": 4500,
+    "single_purpose_reference_tokens": 9000
+  },
+  "skill_md": {
+    "tokens": 2281,
+    "token_method": "tiktoken",
+    "section_count": 9,
+    "frontmatter": {
+      "name": "\"srm-setup\"",
+      "description": "Sets up Skills Repo Manager module in a project. Use when the user requests to 'install srm module', 'configure Skills Repo Manager', or 'setup Skills Repo Manager'.",
+      "description_chars": 165,
+      "description_has_angle_brackets": false,
+      "keys": [
+        "description",
+        "name"
+      ]
+    }
+  },
+  "aggregate": {
+    "total_files_scanned": 1,
+    "total_tokens": 2281,
+    "total_waste_patterns": 0,
+    "total_back_references": 0,
+    "files_with_numbered_prefix": 0
+  },
+  "reference_sizes": {},
+  "files": [
+    {
+      "file": "SKILL.md",
+      "tokens": 2281,
+      "token_method": "tiktoken",
+      "sections": [
+        {
+          "level": 2,
+          "title": "Overview"
+        },
+        {
+          "level": 2,
+          "title": "On Activation"
+        },
+        {
+          "level": 2,
+          "title": "Collect Configuration"
+        },
+        {
+          "level": 2,
+          "title": "Write Files"
+        },
+        {
+          "level": 2,
+          "title": "Create Output Directories"
+        },
+        {
+          "level": 2,
+          "title": "Seed the Sources Registry"
+        },
+        {
+          "level": 2,
+          "title": "Cleanup Legacy Directories"
+        },
+        {
+          "level": 2,
+          "title": "Confirm"
+        },
+        {
+          "level": 2,
+          "title": "Outcome"
+        }
+      ],
+      "table_count": 0,
+      "table_rows": 0,
+      "fenced_block_count": 2,
+      "allcaps_directive_count": 0,
+      "numbered_prefix_filename": false,
+      "waste_patterns": [],
+      "back_references": [],
+      "frontmatter": {
+        "name": "\"srm-setup\"",
+        "description": "Sets up Skills Repo Manager module in a project. Use when the user requests to 'install srm module', 'configure Skills Repo Manager', or 'setup Skills Repo Manager'.",
+        "description_chars": 165,
+        "description_has_angle_brackets": false,
+        "keys": [
+          "description",
+          "name"
+        ]
+      },
+      "is_skill_md": true
+    }
+  ]
+}

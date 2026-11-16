@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Skill Analysis Report</title>
+<style>
+  :root {
+    --bg: #0f1b2d;
+    --panel: #16263d;
+    --panel-2: #1d3250;
+    --ink: #e9eef6;
+    --ink-dim: #9fb0c7;
+    --line: #294366;
+    --accent: #b66d46;
+    --accent-ink: #f4d9c8;
+    --critical: #e05656;
+    --high: #e0904a;
+    --medium: #d8c24a;
+    --low: #5aa0d0;
+    --ok: #4caf72;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 28px 20px 80px; }
+  header h1 { font-size: 22px; margin: 0 0 4px; }
+  header .meta { color: var(--ink-dim); font-size: 13px; }
+  header .meta b { color: var(--ink); font-weight: 600; }
+
+  .banner {
+    display: none;
+    background: #3a1414;
+    border: 1px solid var(--critical);
+    color: #ffd9d9;
+    padding: 14px 16px;
+    border-radius: 8px;
+    margin: 16px 0;
+    white-space: pre-wrap;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+  }
+  .banner.show { display: block; }
+
+  .overview {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+    margin: 18px 0;
+  }
+  .grade {
+    font-size: 34px;
+    font-weight: 800;
+    margin: 0 0 8px;
+    text-transform: capitalize;
+  }
+  .grade.g-excellent { color: var(--ok); }
+  .grade.g-good { color: var(--low); }
+  .grade.g-fair { color: var(--medium); }
+  .grade.g-poor { color: var(--critical); }
+  .verdict { font-size: 16px; font-weight: 600; margin: 0 0 14px; }
+  .summary { color: var(--ink-dim); margin: 0 0 14px; }
+  .counts { display: flex; flex-wrap: wrap; gap: 10px; }
+  .pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    font-size: 13px;
+  }
+  .pill .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .pill .n { font-weight: 700; }
+  .dot.critical { background: var(--critical); }
+  .dot.high { background: var(--high); }
+  .dot.medium { background: var(--medium); }
+  .dot.low { background: var(--low); }
+
+  /* Generic synthesis/agent-block panel */
+  .block {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px;
+    margin: 18px 0;
+  }
+  .block > h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-dim);
+    margin: 0 0 12px;
+  }
+  .block .mono, .block code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    background: var(--panel-2);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .kv { margin: 0; display: grid; grid-template-columns: 150px 1fr; gap: 6px 14px; }
+  .kv dt { color: var(--ink-dim); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .kv dd { margin: 0; }
+
+  /* Themes */
+  .theme { padding: 12px 0; border-top: 1px solid var(--line); }
+  .theme:first-of-type { border-top: none; padding-top: 0; }
+  .theme .t-head { display: flex; align-items: center; gap: 10px; }
+  .theme .t-title { font-weight: 600; flex: 1 1 auto; min-width: 0; }
+  .theme .t-cause { color: var(--ink-dim); margin-top: 4px; }
+  .theme .t-action { margin-top: 4px; }
+  .theme .t-findings { margin-top: 8px; padding-left: 12px; border-left: 2px solid var(--line); }
+  .theme .t-finding { font-size: 13px; color: var(--ink-dim); padding: 2px 0; }
+
+  /* Strengths */
+  .strength-list { margin: 0; padding-left: 20px; }
+  .strength-list li { padding: 2px 0; }
+
+  /* Recommendations */
+  .rec { padding: 8px 0; border-top: 1px solid var(--line); }
+  .rec:first-of-type { border-top: none; padding-top: 0; }
+  .rec .rank { font-weight: 700; color: var(--accent-ink); margin-right: 8px; }
+  .rec .resolves { color: var(--ink-dim); font-size: 12px; margin-left: 8px; }
+
+  /* Experience journeys */
+  .block .journey { padding: 8px 0; border-top: 1px solid var(--line); }
+  .block .journey:first-of-type { border-top: none; padding-top: 0; }
+  .block .journey .j-name { font-weight: 600; }
+  .block .journey .j-steps { color: var(--ink-dim); margin-top: 2px; }
+
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 18px 0 10px;
+    flex-wrap: wrap;
+  }
+  .toolbar .sel-count { color: var(--ink-dim); font-size: 13px; }
+  button {
+    font: inherit;
+    cursor: pointer;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: var(--panel-2);
+    color: var(--ink);
+    padding: 8px 14px;
+  }
+  button.primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #1a0e07;
+    font-weight: 600;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  button.link {
+    background: none;
+    border: none;
+    color: var(--accent-ink);
+    padding: 4px 6px;
+    font-size: 13px;
+  }
+  button.small { padding: 5px 10px; font-size: 13px; flex: 0 0 auto; }
+
+  .no-findings {
+    background: var(--panel);
+    border: 1px dashed var(--line);
+    border-radius: 10px;
+    padding: 28px;
+    text-align: center;
+    color: var(--ink-dim);
+  }
+  .no-findings .big { font-size: 18px; color: var(--ok); margin-bottom: 6px; }
+
+  .group { margin: 18px 0; }
+  .group > h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-dim);
+    margin: 0 0 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .finding {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-left: 4px solid var(--line);
+    border-radius: 8px;
+    margin: 8px 0;
+    overflow: hidden;
+  }
+  .finding.sev-critical { border-left-color: var(--critical); }
+  .finding.sev-high { border-left-color: var(--high); }
+  .finding.sev-medium { border-left-color: var(--medium); }
+  .finding.sev-low { border-left-color: var(--low); }
+
+  .finding .row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+  }
+  .finding .row .chk { width: 16px; height: 16px; flex: 0 0 auto; cursor: pointer; }
+  .finding .row .head { flex: 1 1 auto; cursor: pointer; min-width: 0; }
+  .finding .row .title { font-weight: 600; }
+  .finding .row .sub { color: var(--ink-dim); font-size: 12px; margin-top: 2px; }
+  .finding .tag {
+    flex: 0 0 auto;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--panel-2);
+    border: 1px solid var(--line);
+    color: var(--ink-dim);
+  }
+  .finding .caret { flex: 0 0 auto; color: var(--ink-dim); transition: transform 0.15s; cursor: pointer; }
+  .finding.open .caret { transform: rotate(90deg); }
+
+  .finding .body {
+    display: none;
+    padding: 0 14px 14px 42px;
+    border-top: 1px solid var(--line);
+  }
+  .finding.open .body { display: block; }
+  .finding .body dl { margin: 12px 0 0; display: grid; grid-template-columns: 130px 1fr; gap: 6px 14px; }
+  .finding .body dt { color: var(--ink-dim); font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .finding .body dd { margin: 0; }
+  .finding .body code, .finding .body .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+    background: var(--panel-2);
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+
+  .toast {
+    position: fixed;
+    left: 50%;
+    bottom: 28px;
+    transform: translateX(-50%);
+    background: var(--ok);
+    color: #06160c;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: 600;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+
+  .fallback-area { margin-top: 12px; display: none; }
+  .fallback-area.show { display: block; }
+  .fallback-area textarea {
+    width: 100%;
+    min-height: 160px;
+    background: var(--panel-2);
+    color: var(--ink);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 10px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Skill Analysis Report</h1>
+    <div class="meta">
+      <span>Subject: <b id="m-subject">—</b></span> &nbsp;·&nbsp;
+      <span>Generated: <b id="m-generated">—</b></span> &nbsp;·&nbsp;
+      <span>Schema: <b id="m-schema">—</b></span>
+    </div>
+  </header>
+
+  <div id="parse-banner" class="banner"></div>
+
+  <section id="overview" class="overview" hidden>
+    <div id="grade" class="grade" hidden></div>
+    <p id="verdict" class="verdict"></p>
+    <p id="summary-text" class="summary" hidden></p>
+    <div id="counts" class="counts"></div>
+  </section>
+
+  <!-- Synthesis layer (themes, strengths, recommendations). Hidden when absent. -->
+  <section id="themes" class="block" hidden></section>
+  <section id="strengths" class="block" hidden></section>
+  <section id="recommendations" class="block" hidden></section>
+
+  <!-- Experience: journeys plus headless (experience). Hidden when absent. -->
+  <section id="experience" class="block" hidden></section>
+
+  <div id="toolbar" class="toolbar" hidden>
+    <button id="btn-copy" class="primary" disabled>Copy selected as paste-back prompt</button>
+    <span id="sel-count" class="sel-count">0 selected</span>
+    <button id="btn-select-all" class="link">Select all</button>
+    <button id="btn-clear" class="link">Clear</button>
+    <button id="btn-expand-all" class="link">Expand all</button>
+    <button id="btn-collapse-all" class="link">Collapse all</button>
+  </div>
+
+  <div id="fallback" class="fallback-area">
+    <p class="sel-count">Clipboard was unavailable. Copy the text below manually:</p>
+    <textarea id="fallback-text" readonly></textarea>
+  </div>
+
+  <div id="findings-root"></div>
+</div>
+
+<div id="toast" class="toast">Copied</div>
+
+<!-- scripts/render_report.py replaces the contents of this island per run.
+     The placeholder below is intentionally unusable: the shell refuses to
+     render it, so a failed injection can never look like real findings. -->
+<script type="application/json" id="report-data">
+{
+  "schema_version": 2,
+  "subject": "C:\\Core\\Businesses\\skills\\sets\\srm (srm-sync + srm-setup) — clone-missing changes",
+  "generated": "2026-11-16T21:56:00+08:00",
+  "verdict": "The clone-missing feature is well-placed and mirrors the stale/prune confirm-gate, but its clone-failure signal, silent registry-path rewrite, and the hand-rolled seeded-path check leave gaps a real run will hit.",
+  "grade": "good",
+  "summary": "The change earns its place almost everywhere: clone_into() is a clean extraction, --clone-missing is properly user-gated, and the seed url comment fix was overdue. The primary opportunity is disclosure — failed clones collapse into 'missing', a registry path rewrite happens silently, and srm-setup re-derives in prose what the script can already compute.",
+  "standards": {
+    "canon": "C:\\Core\\Businesses\\skills\\.agents\\skills\\bmad-workflow-builder\\references\\prompt-quality-canon.md",
+    "principles": "C:\\Core\\Businesses\\skills\\.agents\\skills\\bmad-workflow-builder\\references\\skill-quality-principles.md",
+    "scripts": "C:\\Core\\Businesses\\skills\\.agents\\skills\\bmad-workflow-builder\\references\\script-standards.md"
+  },
+  "themes": [
+    {
+      "title": "Clone-flow results are under-disclosed and under-routed",
+      "root_cause": "--clone-missing produces three outcomes (cloned, failed, not-attempted) but the report collapses failed clones into the same `missing` list as never-tried ones, and the registry `path` rewrite on divergent targets is invisible. The offered single-repo alternative (`clone --url`) can neither fix a divergent registered path nor finish the job alone — it still needs a follow-up sync.",
+      "finding_ids": [
+        "enhancement-1",
+        "enhancement-2",
+        "architecture-1",
+        "enhancement-3",
+        "architecture-4"
+      ],
+      "action": "Split the signal and disclose the mutation: give `missing` entries a reason/error field (or add `path_repointed` to the repo row), teach SKILL.md to show clone errors instead of re-offering the same flag, and route single-repo fetches through `sync --repo <name> --clone-missing` — or extend the `clone --url` clause with 'then sync --repo <name>'."
+    },
+    {
+      "title": "The seeded-clone check is hand-rolled where a script already computes it",
+      "root_cause": "srm-setup instructs the model to parse sources.yaml, resolve nested `{skills_repo_root}`/`{project-root}` tokens, stat six paths, and count — deterministic work sync.py's `missing` array already performs. The paragraph also restates srm-sync's flag mechanics in the wrong file and is written only against the fresh-seed branch, missing the preserved-registry path.",
+      "finding_ids": [
+        "determinism-1",
+        "leanness-1",
+        "enhancement-5"
+      ],
+      "action": "Emit the clone-status check from a read-only sync mode (e.g. `sync.py missing` or `sync --dry-run` emitting `{cloned, missing}` via module_vars/resolve), apply it to every registered entry rather than just seeds, and compress the srm-setup paragraph to one goal sentence."
+    },
+    {
+      "title": "Schema-of-record text drifted from the new behavior",
+      "root_cause": "Two canonical descriptions still describe the pre-feature world: adaptation.md's registry schema calls `url` 'informational' while it is now the clone source, and SKILL.md's hard-rules line scopes `git clone` to 'the clone command' while sync --clone-missing also runs it.",
+      "finding_ids": [
+        "architecture-2",
+        "architecture-3"
+      ],
+      "action": "Update adaptation.md's url comment to match sources-seed.yaml ('clone URL — sync --clone-missing fetches a missing repo from here; empty = hand-managed checkout') and broaden the hard-rule parenthetical to 'via the clone command or sync --clone-missing'."
+    },
+    {
+      "title": "Author-specific seed registry has no customization surface",
+      "root_cause": "srm-setup hardcodes './assets/sources-seed.yaml' — the author's own repo picks — and neither srm skill ships a customize.toml, so an org wanting its own standard source list (now load-bearing on fresh workspaces) must fork.",
+      "finding_ids": [
+        "customization-1",
+        "customization-2"
+      ],
+      "action": "Opt srm-setup into customize.toml with `sources_seed_template = \"assets/sources-seed.yaml\"` under [workflow] and read `{workflow.sources_seed_template}` at seed time; the free `on_complete` scalar then also covers post-install hooks (e.g. auto `srm-sync --clone-missing`)."
+    }
+  ],
+  "strengths": [
+    "clone_into() extraction is a clean deduplication — cmd_clone becomes a thin wrapper and cmd_sync reuses identical clone semantics.",
+    "The confirm-gate is correctly mirrored: 'do not clone uninvited' matches the established 'do not prune uninvited' pattern, keeping the clone decision in user hands while the script stays pure plumbing.",
+    "Seeded registry paths are pre-aligned to the canonical <skills_repo_root>/<owner>/<repo> convention, so the path-rewrite edge case never fires for the shipped six.",
+    "missing[] entries carry name/path/url — enough for a model to act without re-deriving anything."
+  ],
+  "recommendations": [
+    {
+      "rank": 1,
+      "action": "Split clone outcomes in the report (reason on missing entries, path_repointed on repo rows) and teach the SKILL.md to show clone errors rather than re-offer the same flag",
+      "resolves": [
+        "enhancement-1",
+        "enhancement-2",
+        "architecture-1"
+      ]
+    },
+    {
+      "rank": 2,
+      "action": "Move the cloned/missing check into a read-only sync.py mode emitting compact JSON, cover registered (not just seeded) entries, and compress the srm-setup paragraph to a goal sentence",
+      "resolves": [
+        "determinism-1",
+        "leanness-1",
+        "enhancement-5"
+      ]
+    },
+    {
+      "rank": 3,
+      "action": "Fix the two drifted descriptions (adaptation.md url comment, hard-rule clone scope) and complete the single-repo guidance ('then sync --repo <name>' or route via --repo --clone-missing)",
+      "resolves": [
+        "architecture-2",
+        "architecture-3",
+        "architecture-4",
+        "enhancement-3"
+      ]
+    },
+    {
+      "rank": 4,
+      "action": "Add customize.toml to srm-setup exposing sources_seed_template",
+      "resolves": [
+        "customization-1",
+        "customization-2"
+      ]
+    },
+    {
+      "rank": 5,
+      "action": "Pre-existing debt worth a separate pass: bare-path conversion + '## Resolution rules' blocks in both SKILL.mds, and scope the add-flow 'always ask prefix' rule to only when none was supplied",
+      "resolves": [
+        "architecture-5",
+        "architecture-6",
+        "enhancement-4"
+      ]
+    }
+  ],
+  "experience": {
+    "journeys": [
+      {
+        "name": "Fresh workspace",
+        "steps": "srm-setup → seed review → clone-status report → srm-sync → sees missing[] → confirms → sync --clone-missing → cloned + mapped"
+      },
+      {
+        "name": "Single new repo",
+        "steps": "srm-sync add <url> → clone → detect → prefix ask → add → sync --repo"
+      }
+    ],
+    "headless": "sync/add flags are fully parameterizable except the add-time prefix ask, which has no 'use supplied value' escape hatch (enhancement-4)."
+  },
+  "findings": [
+    {
+      "id": "leanness-1",
+      "lens": "leanness",
+      "severity": "low",
+      "title": "Seed-clone check paragraph restates srm-sync's mechanics",
+      "location": "sets/srm/srm-setup/SKILL.md:66",
+      "evidence": "The new paragraph's parenthetical — `(--clone-missing` fetches each via its registry `url`; a plain `srm-sync` lists them as `missing` and offers the same)` — spells out another skill's flag mechanics and report-field names. A model running srm-setup only needs to tell the user that srm-sync will fetch missing repos on demand; the flag detail is then re-delivered by srm-sync itself at run time (the parenthetical even admits a plain sync offers it). This is downstream mechanics living in the wrong file plus a fact now restated across both skills' docs — if the flag is renamed, two files must change. The explicit procedure ('resolve {skills_repo_root}... stat each seeded path') and the meta-clause 'This sets expectations...' are also inferable around the core goal.",
+      "recommendation": "Compress the paragraph to one goal sentence that keeps the non-inferables (the check, the on-demand message, the 'none is normal' calibration): '**Report clone status for the seeded sources.** Resolve `{skills_repo_root}` from the config just written, report plainly how many seeded `path`s exist locally (e.g. \"2 of 6 sources cloned locally\"), and note that `srm-sync` fetches the rest on demand — on a fresh workspace, typically none exist yet.'",
+      "proposed_smallest": "**Report clone status for the seeded sources.** Resolve `{skills_repo_root}` from the config just written, report plainly how many seeded `path`s exist locally (e.g. \"2 of 6 sources cloned locally\"), and note that `srm-sync` fetches the rest on demand — on a fresh workspace, typically none exist yet.",
+      "predicted_delta": "The user-facing message loses the `--clone-missing` flag name and the `missing` field name — both re-surfaced by srm-sync itself when the user runs it (plain sync lists missing and offers the clone). Expected loss is effectively nil. Route to variant eval to confirm."
+    },
+    {
+      "id": "architecture-1",
+      "lens": "architecture",
+      "severity": "medium",
+      "title": "--clone-missing silently rewrites the registered path when it differs from the URL-derived location",
+      "location": "srm-sync/scripts/sync.py:587-600; srm-sync/SKILL.md:51",
+      "evidence": "clone_into() always targets <skills_repo_root>/<owner>/<repo> derived from the git URL, not the registry path. When cl['resolved'] != rroot, cmd_sync mutates repo['path'] and calls save_yaml(reg_path, data) — rewriting the user-managed sources.yaml mid-sync with no mention in the report or SKILL.md. The new SKILL.md guidance ('offer to re-run with --clone-missing to fetch them all') discloses nothing about this repoint, and the same issue surfaces via 'clone --url <url> for one': cloning a registered entry whose path differs lands the checkout where sync still won't look, so the entry reports missing again. Seed entries are pre-aligned (e.g. url BlackUnicornSecurity/BMAD-CYBERSEC.git → path {skills_repo_root}/BlackUnicornSecurity/BMAD-CYBERSEC), so the seeded six never trigger it — only hand-registered entries with custom paths do.",
+      "recommendation": "Either clone to the registered path (git clone <url> <rroot>) so the registry stays authoritative, or surface the repoint in the JSON report (e.g. 'path_repointed': {from, to}) and add one clause to the SKILL.md missing-block guidance noting that entries whose path differs from <owner>/<repo> get repointed to the clone location."
+    },
+    {
+      "id": "architecture-2",
+      "lens": "architecture",
+      "severity": "medium",
+      "title": "adaptation.md registry schema still documents url as 'informational'",
+      "location": "srm-sync/references/adaptation.md:14",
+      "evidence": "The carved schema reference reads `url: https://github.com/...git      # informational`. The feature made url load-bearing: --clone-missing fetches from it, entries with empty url 'can't be fetched' per the new SKILL.md guidance, and sources-seed.yaml's comment was updated to say exactly that — but the schema file of record was not. A model that loads adaptation.md to edit the registry by hand (the seed file itself points there for the schema) learns the field is decorative.",
+      "recommendation": "Update the schema comment in adaptation.md to match sources-seed.yaml: 'clone URL — sync --clone-missing fetches a missing repo from here; empty = hand-managed checkout'."
+    },
+    {
+      "id": "architecture-3",
+      "lens": "architecture",
+      "severity": "medium",
+      "title": "Hard-rules line still scopes git clone to 'the clone command'",
+      "location": "srm-sync/SKILL.md:14",
+      "evidence": "The stated hard rule reads: 'The only operations performed on sources are `git clone` (first fetch into `skills_repo_root`, via the `clone` command) and `git pull --ff-only`'. sync --clone-missing now runs git clone inside the sync flow — outside the enumerated 'via the clone command' scope. The principle stated in the Overview no longer matches the execution instructions added two sections later; on a literal read the new option contradicts the hard rule.",
+      "recommendation": "Broaden the parenthetical to cover both entry points, e.g. '`git clone` (first fetch into `skills_repo_root`, via the `clone` command or `sync --clone-missing`)'."
+    },
+    {
+      "id": "architecture-4",
+      "lens": "architecture",
+      "severity": "low",
+      "title": "Single-repo fetch guidance stops one step short of done",
+      "location": "srm-sync/SKILL.md:51",
+      "evidence": "The new missing-block guidance offers 'clone --url <url> for one' as an alternative to --clone-missing, but clone only fetches — the repo still isn't mapped until a follow-up `sync --repo <name>` runs. A literal reading can end the flow with the fetch complete and nothing materialized.",
+      "recommendation": "Extend the clause to 'clone --url <url> for one, then sync --repo <name>'."
+    },
+    {
+      "id": "architecture-5",
+      "lens": "architecture",
+      "severity": "low",
+      "title": "Missing canonical Resolution-rules block; non-canonical ./ prefixes on internal paths (pre-existing)",
+      "location": "srm-sync/SKILL.md:23,62,108; srm-setup/SKILL.md:10,22,35,39,54,62,82,86",
+      "evidence": "Both SKILL.mds route to multiple internal files (references/adaptation.md, assets/, scripts/) but carry no '## Resolution rules' block, which the principles require to be stamped into any multi-file SKILL.md. The collected path-standards prepass shows the same root cause as lint: 4 cross-dir ./ findings in srm-sync (prepass-paths-sync.json) and 10 in srm-setup plus one absolute-path example (prepass-paths-setup.json). Pre-existing — the diff added no internal file references — but both touched files still carry it.",
+      "recommendation": "Drop the ./ prefixes in favor of bare paths (scripts/sync.py, references/adaptation.md, assets/module.yaml) and add the canonical '## Resolution rules' block to each SKILL.md; srm-setup:45's real-path example (/home/me/myapp) can stay as an illustration, not a reference."
+    },
+    {
+      "id": "architecture-6",
+      "lens": "architecture",
+      "severity": "low",
+      "title": "Both SKILL.mds sit in the token warn band; the new paragraph grows srm-setup's heaviest section",
+      "location": "srm-setup/SKILL.md:60-68; srm-sync/SKILL.md",
+      "evidence": "srm-setup is 2281 tokens and srm-sync 1804 against budgets [1500 desired / 2500 hard]. The 'Seed the Sources Registry' section absorbed the new clone-check paragraph plus the prior prefix-review paragraph, making it the densest section in the warn-band file. Under the tier rules this is warn-not-block, but the drift direction is toward budget and the seed section is the named lift candidate.",
+      "recommendation": "No carve needed yet; if srm-setup crosses 2500, lift 'Seed the Sources Registry' (seed review + clone check + schema summary) to references/ and leave a one-line pointer. For srm-sync, 'What the script does (reference)' is the lift candidate if it grows."
+    },
+    {
+      "id": "determinism-1",
+      "lens": "determinism",
+      "severity": "medium",
+      "title": "Prompt stats seeded repo paths and counts cloned sources by hand",
+      "location": "sets/srm/srm-setup/SKILL.md:66 ('Check which seeds are already cloned')",
+      "evidence": "\"Resolve `{skills_repo_root}` from the config just written and stat each seeded `path`. Report plainly — '2 of 6 sources cloned locally'\" — this asks the LLM to parse sources.yaml, resolve the `{skills_repo_root}` token (whose stored value itself contains the literal `{project-root}` token, per the warning at line 18 and `module_vars()`'s nested resolve at scripts/sync.py:70), stat 6 paths, and count. Each step has one correct answer for a given input — a unit test could verify it — and the nested-token resolution is easy to fumble into a literal-`{project-root}` stat that misreports every seed as missing on re-setup runs.",
+      "recommendation": "Determinism leak — push into a script. Apply the determinism test (resolve/stat/count are all pass-fail operations) and the signal-verb scan ('check which seeds are cloned', 'stat each path', 'report N of 6'). Add a read-only mode to srm-sync's engine — e.g. `sync.py missing` or `sync --dry-run` — that resolves tokens via the existing `module_vars()`/`resolve()` and emits compact JSON `{cloned: [...], missing: [...]}` (pre-pass JSON pattern; the `missing` array already exists in cmd_sync's report). srm-setup then runs one script call and reports the count instead of re-deriving it."
+    },
+    {
+      "id": "customization-1",
+      "lens": "customization",
+      "severity": "medium",
+      "title": "Author-specific seed registry hardcoded, not exposed as a template",
+      "location": "srm-setup/SKILL.md:62 → assets/sources-seed.yaml",
+      "evidence": "SKILL.md copies './assets/sources-seed.yaml' verbatim into {project-root}/_bmad/srm/sources.yaml. The seed ships the author's own picks (BMAD-CYBERSEC plus five named third-party repos). An org adopting srm would plausibly want to seed its own standard source list — especially now that the new 'check which seeds are already cloned' step makes the seed's contents load-bearing on fresh workspaces — but must fork the whole skill to swap it. This is the guide's '<purpose>_template' case: the skill loads a template the user might want to swap.",
+      "recommendation": "Opt srm-setup into customize.toml (the one template alone justifies it) with `sources_seed_template = \"assets/sources-seed.yaml\"` under [workflow], and have the Seed the Sources Registry section read `{workflow.sources_seed_template}` instead of the hardcoded path. module.yaml and module-help.csv stay hardcoded — they are module manifests, not user-swappable templates."
+    },
+    {
+      "id": "customization-2",
+      "lens": "customization",
+      "severity": "low",
+      "title": "One-shot install ends with a fixed 'do not sync' boundary — on_complete candidate",
+      "location": "srm-setup/SKILL.md:64-66",
+      "evidence": "The skill produces its config artifacts and stops, with an explicit rule: 'Do not run srm-sync as part of setup; mapping is the user's explicit next step.' That is a deliberate default, but an org wanting post-install behavior (auto-run srm-sync --clone-missing on fresh workspaces, notification, audit step) can only fork.",
+      "recommendation": "If customization-1 is adopted, the universal `on_complete` scalar comes with it for free and covers this case — no extra surface needed. Not worth a customize.toml on its own."
+    },
+    {
+      "id": "enhancement-1",
+      "lens": "enhancement",
+      "severity": "medium",
+      "title": "Add: distinguish 'not yet cloned' from 'clone failed' in the missing flow",
+      "location": "sets/srm/srm-sync/SKILL.md:51 + scripts/sync.py:588-594",
+      "evidence": "Pattern involved: confirm-then-rerun offer (the stale/prune pattern applied to `missing`). When `--clone-missing` is supplied and a clone fails (private repo, bad URL, non-git dir blocking the target), the repo lands in `missing` anyway — the failure lives only in `repos.<name>.error` and `warnings`. SKILL.md then instructs the model to 'offer to re-run with --clone-missing' — the exact flag the user just ran, producing a dead-end retry loop for persistent failures like auth errors.",
+      "recommendation": "Split the signal: either give `missing` entries a `reason`/`error` field in the report, or extend the SKILL.md paragraph — 'entries under `missing` whose `repos.<name>.error` is set failed to clone this run; show the error and its fix (auth, URL), do not re-offer the same command.'"
+    },
+    {
+      "id": "enhancement-2",
+      "lens": "enhancement",
+      "severity": "medium",
+      "title": "Add: surface the silent registry path rewrite --clone-missing performs",
+      "location": "sets/srm/srm-sync/SKILL.md:45-51 + scripts/sync.py:596-599",
+      "evidence": "Pattern involved: gate-and-disclose on mutation (the skill's own convention — prune and --delete-skills both require user confirmation and are reported). On `--clone-missing`, if the clone's canonical location (`{skills_repo_root}/<owner>/<repo>`) differs from the registered `path`, sync.py writes `repo['path'] = cl['path']` and calls `save_yaml` — sync now mutates sources.yaml, invisible to the user and unmentioned in SKILL.md. A user who hand-set `path` to a non-canonical checkout (with `url` recorded) gets their entry silently 'corrected'.",
+      "recommendation": "Disclose it: add a `path_updated` field (or teach the model 'when `cloned` appears alongside a changed `path`, tell the user the registry entry was corrected to the clone location'). If the rewrite is meant as an auto-fix rather than a guarantee, gate it behind the same offer used for missing itself."
+    },
+    {
+      "id": "enhancement-3",
+      "lens": "enhancement",
+      "severity": "medium",
+      "title": "Add: `clone --url` alternative for a single repo cannot fix a divergent registered path",
+      "location": "sets/srm/srm-sync/SKILL.md:51",
+      "evidence": "Pattern involved: complete-the-remediation (an offered fix must actually resolve the reported condition). The missing paragraph offers '`clone --url <url>` for one', but `cmd_clone`/`clone_into` only clones into `{skills_repo_root}/<owner>/<repo>` and returns path info — it never updates the registry `path`, and no path-edit command exists (remove + re-add is the only route). For any entry whose registered `path` isn't the canonical `<owner>/<repo>` location — e.g. a hand-managed or custom-located checkout with a url — the repo stays `missing` on the next sync even after a successful clone.",
+      "recommendation": "Complete the instruction: 'or `clone --url <url>` for one — if the clone lands somewhere other than the registered `path`, update the entry's `path` to the returned value (remove + `add`, or a registry edit) before re-syncing.' Better still, route single-repo fetches through `sync --repo <name> --clone-missing`, which already fixes the path."
+    },
+    {
+      "id": "enhancement-4",
+      "lens": "enhancement",
+      "severity": "low",
+      "title": "Opportunity: let a supplied prefix satisfy the add-time ask (headless readiness)",
+      "location": "sets/srm/srm-sync/SKILL.md:17,63",
+      "evidence": "Pattern involved: parameter-replaces-the-question (headless adaptability). Hard rule 'During `add`, always ask' plus step 2 'ask the user for the prefix' — but `sync.py add` accepts `--prefix` and errors only when absent ('--prefix is required (ask the user)'). A headless caller or a user who supplies 'add <url> with prefix foo' is still marched through the question. The rest of srm-sync is easily adaptable (every intent is flag-driven); `add` is the lone holdout — pre-existing, not introduced by this diff, but now adjacent to the new clone flow it touches.",
+      "recommendation": "Scope the rule, don't remove it: 'ask for the prefix unless one was supplied with the invocation — prefixes are never guessed.' Keeps the never-guessed constraint while making `add` fully parameterizable."
+    },
+    {
+      "id": "enhancement-5",
+      "lens": "enhancement",
+      "severity": "low",
+      "title": "Opportunity: 'stat each seeded path' doesn't cover the preserved-registry branch",
+      "location": "sets/srm/srm-setup/SKILL.md:62-66",
+      "evidence": "Pattern involved: complete-the-branch (the new check is written against the seed-copy path). The paragraph says 'stat each seeded `path`', but two sentences earlier the flow splits: if `sources.yaml` already exists it is preserved untouched, and there are no seeded entries to stat. A literal reader on the update path checks nothing, or checks seed paths that aren't in the user's actual registry.",
+      "recommendation": "Change 'each seeded `path`' to 'each registered `path`' (or 'each entry in sources.yaml') so the clone-status report works identically on fresh-seed and preserved-registry runs."
+    }
+  ]
+}
+</script>
+
+<script>
+(function () {
+  "use strict";
+
+  var SEVERITIES = ["critical", "high", "medium", "low"];
+  var SEV_LABEL = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
+  var GRADES = ["excellent", "good", "fair", "poor"];
+  var PLACEHOLDER_SUBJECT = "__PLACEHOLDER__";
+
+  var els = {
+    banner: document.getElementById("parse-banner"),
+    overview: document.getElementById("overview"),
+    grade: document.getElementById("grade"),
+    verdict: document.getElementById("verdict"),
+    summaryText: document.getElementById("summary-text"),
+    counts: document.getElementById("counts"),
+    themes: document.getElementById("themes"),
+    strengths: document.getElementById("strengths"),
+    recommendations: document.getElementById("recommendations"),
+    experience: document.getElementById("experience"),
+    toolbar: document.getElementById("toolbar"),
+    root: document.getElementById("findings-root"),
+    subject: document.getElementById("m-subject"),
+    generated: document.getElementById("m-generated"),
+    schema: document.getElementById("m-schema"),
+    selCount: document.getElementById("sel-count"),
+    btnCopy: document.getElementById("btn-copy"),
+    btnSelectAll: document.getElementById("btn-select-all"),
+    btnClear: document.getElementById("btn-clear"),
+    btnExpandAll: document.getElementById("btn-expand-all"),
+    btnCollapseAll: document.getElementById("btn-collapse-all"),
+    fallback: document.getElementById("fallback"),
+    fallbackText: document.getElementById("fallback-text"),
+    toast: document.getElementById("toast")
+  };
+
+  var selected = Object.create(null);
+  var findings = [];
+  var findingsById = Object.create(null);
+  var subjectPath = "";
+  var standards = null;
+
+  function showBanner(message) {
+    els.banner.textContent = message;
+    els.banner.classList.add("show");
+  }
+
+  function esc(value) {
+    var s = value == null ? "" : String(value);
+    return s.replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  // Normalize an arbitrary parsed object against schema_version 2, supplying
+  // defaults so a partial or future island still renders. Unknown fields are
+  // ignored, not fatal. Severity counts are always derived from the findings
+  // array, never read from the island, so they cannot disagree with it. The
+  // synthesis blocks (grade, summary, themes, strengths, recommendations) and
+  // the experience block are OPTIONAL: each normalizes to an empty value that
+  // renders nothing rather than an empty panel or an error.
+  function normalize(raw) {
+    var obj = raw && typeof raw === "object" ? raw : {};
+    var rawFindings = Array.isArray(obj.findings) ? obj.findings : [];
+
+    var norm = {
+      schema_version: typeof obj.schema_version === "number" ? obj.schema_version : 2,
+      subject: obj.subject != null ? String(obj.subject) : "(unspecified)",
+      generated: obj.generated != null ? String(obj.generated) : "(unspecified)",
+      verdict: obj.verdict != null ? String(obj.verdict) : "(no verdict supplied)",
+      grade: GRADES.indexOf(String(obj.grade || "").toLowerCase()) >= 0
+        ? String(obj.grade).toLowerCase() : "",
+      summary: typeof obj.summary === "string" ? obj.summary : "",
+      standards: (obj.standards && typeof obj.standards === "object") ? {
+        canon: obj.standards.canon != null ? String(obj.standards.canon) : "",
+        principles: obj.standards.principles != null ? String(obj.standards.principles) : "",
+        scripts: obj.standards.scripts != null ? String(obj.standards.scripts) : ""
+      } : null,
+      themes: normalizeThemes(obj.themes),
+      strengths: normalizeStrengths(obj.strengths),
+      recommendations: normalizeRecommendations(obj.recommendations),
+      experience: normalizeExperience(obj.experience),
+      counts: { critical: 0, high: 0, medium: 0, low: 0 },
+      findings: []
+    };
+
+    rawFindings.forEach(function (f, i) {
+      if (!f || typeof f !== "object") { return; }
+      var sev = SEVERITIES.indexOf(f.severity) >= 0 ? f.severity : "low";
+      norm.findings.push({
+        id: f.id != null ? String(f.id) : "finding-" + (i + 1),
+        lens: f.lens != null ? String(f.lens) : "(unknown)",
+        severity: sev,
+        title: f.title != null ? String(f.title) : "(untitled finding)",
+        location: f.location != null ? String(f.location) : "",
+        evidence: f.evidence != null ? String(f.evidence) : "",
+        recommendation: f.recommendation != null ? String(f.recommendation) : "",
+        proposed_smallest: f.proposed_smallest != null ? String(f.proposed_smallest) : "",
+        predicted_delta: f.predicted_delta != null ? String(f.predicted_delta) : ""
+      });
+      norm.counts[sev] += 1;
+    });
+
+    return norm;
+  }
+
+  function normalizeThemes(raw) {
+    if (!Array.isArray(raw)) { return []; }
+    var list = [];
+    raw.forEach(function (t) {
+      if (!t || typeof t !== "object") { return; }
+      var ids = [];
+      if (Array.isArray(t.finding_ids)) {
+        t.finding_ids.forEach(function (id) { if (id != null) { ids.push(String(id)); } });
+      }
+      var title = t.title != null ? String(t.title) : "";
+      if (!title && !ids.length) { return; }
+      list.push({
+        title: title || "(untitled theme)",
+        root_cause: t.root_cause != null ? String(t.root_cause) : "",
+        action: t.action != null ? String(t.action) : "",
+        finding_ids: ids
+      });
+    });
+    return list;
+  }
+
+  function normalizeStrengths(raw) {
+    if (!Array.isArray(raw)) { return []; }
+    var list = [];
+    raw.forEach(function (s) {
+      if (typeof s === "string" && s) { list.push(s); }
+      else if (s && typeof s === "object" && s.title) {
+        list.push(String(s.title) + (s.detail ? " — " + String(s.detail) : ""));
+      }
+    });
+    return list;
+  }
+
+  function normalizeRecommendations(raw) {
+    if (!Array.isArray(raw)) { return []; }
+    var list = [];
+    raw.forEach(function (r, i) {
+      if (!r || typeof r !== "object") { return; }
+      var action = r.action != null ? String(r.action) : "";
+      if (!action) { return; }
+      var resolves = "";
+      if (Array.isArray(r.resolves)) { resolves = r.resolves.map(String).join(", "); }
+      else if (typeof r.resolves === "number") { resolves = r.resolves + " findings"; }
+      else if (r.resolves != null) { resolves = String(r.resolves); }
+      list.push({
+        rank: typeof r.rank === "number" ? r.rank : i + 1,
+        action: action,
+        resolves: resolves
+      });
+    });
+    list.sort(function (a, b) { return a.rank - b.rank; });
+    return list;
+  }
+
+  // Optional experience block: journeys plus a headless note. Returns null when
+  // neither is usable.
+  function normalizeExperience(raw) {
+    if (!raw || typeof raw !== "object") { return null; }
+    var journeys = [];
+    if (Array.isArray(raw.journeys)) {
+      raw.journeys.forEach(function (j) {
+        if (!j || typeof j !== "object") { return; }
+        var name = j.name != null ? String(j.name) : "";
+        var steps = j.steps != null ? String(j.steps) : "";
+        if (!name && !steps) { return; }
+        journeys.push({ name: name, steps: steps });
+      });
+    }
+    var headless = raw.headless != null ? String(raw.headless) : "";
+    if (!journeys.length && !headless) { return null; }
+    return { journeys: journeys, headless: headless };
+  }
+
+  function renderOverview(data) {
+    els.subject.textContent = data.subject;
+    els.generated.textContent = data.generated;
+    els.schema.textContent = String(data.schema_version);
+    els.verdict.textContent = data.verdict;
+
+    if (data.grade) {
+      els.grade.textContent = data.grade;
+      els.grade.className = "grade g-" + data.grade;
+      els.grade.hidden = false;
+    }
+    if (data.summary) {
+      els.summaryText.textContent = data.summary;
+      els.summaryText.hidden = false;
+    }
+
+    els.counts.innerHTML = "";
+    SEVERITIES.forEach(function (s) {
+      var pill = document.createElement("span");
+      pill.className = "pill";
+      pill.innerHTML =
+        '<span class="dot ' + s + '"></span>' +
+        '<span class="lbl">' + SEV_LABEL[s] + '</span>' +
+        '<span class="n">' + data.counts[s] + "</span>";
+      els.counts.appendChild(pill);
+    });
+    els.overview.hidden = false;
+  }
+
+  // Every copied fix prompt opens by anchoring the fixing session to the same
+  // standards that produced the findings, so the fix is held to the bar too.
+  function standardsPreamble() {
+    if (!standards || !standards.canon) { return []; }
+    var bar = standards.canon + (standards.principles ? " and " + standards.principles : "");
+    var lines = [
+      "Hold " + bar + " as the bar for every line you change — a fix that adds ceremony is a new finding, not a fix."
+    ];
+    if (standards.scripts) {
+      lines.push("If the fix adds or changes scripts, follow " + standards.scripts + ".");
+    }
+    lines.push("");
+    return lines;
+  }
+
+  function composeThemePrompt(theme, resolved) {
+    var lines = standardsPreamble();
+    lines.push("Fix the following theme in " + subjectPath + ": " + theme.title);
+    lines.push("");
+    if (theme.root_cause) { lines.push("Root cause: " + theme.root_cause); }
+    if (theme.action) { lines.push("Fix: " + theme.action); }
+    if (resolved.length) {
+      lines.push("");
+      lines.push("Findings to address:");
+      resolved.forEach(function (f, i) {
+        lines.push((i + 1) + ". " + f.title);
+        if (f.location) { lines.push("   Location: " + f.location); }
+        if (f.evidence) { lines.push("   Evidence: " + f.evidence); }
+        if (f.recommendation) { lines.push("   Recommendation: " + f.recommendation); }
+      });
+    }
+    return lines.join("\n") + "\n";
+  }
+
+  function renderThemes(themes) {
+    if (!themes.length) { els.themes.hidden = true; return; }
+    els.themes.innerHTML = "<h2>Themes</h2>";
+    themes.forEach(function (t) {
+      var resolved = t.finding_ids
+        .map(function (id) { return findingsById[id]; })
+        .filter(function (f) { return !!f; });
+      var items = resolved.map(function (f) {
+        return '<div class="t-finding"><span class="mono">' + esc(f.id) + "</span> " +
+          esc(f.title) +
+          (f.location ? ' · <span class="mono">' + esc(f.location) + "</span>" : "") +
+          "</div>";
+      }).join("");
+
+      var node = document.createElement("div");
+      node.className = "theme";
+      node.innerHTML =
+        '<div class="t-head"><span class="t-title">' + esc(t.title) + "</span>" +
+        '<button class="small t-fix">Fix This Theme</button></div>' +
+        (t.root_cause ? '<div class="t-cause">Root cause: ' + esc(t.root_cause) + "</div>" : "") +
+        (t.action ? '<div class="t-action"><b>Fix:</b> ' + esc(t.action) + "</div>" : "") +
+        (items ? '<div class="t-findings">' + items + "</div>" : "");
+      node.querySelector(".t-fix").addEventListener("click", function () {
+        copyText(composeThemePrompt(t, resolved));
+      });
+      els.themes.appendChild(node);
+    });
+    els.themes.hidden = false;
+  }
+
+  function renderStrengths(list) {
+    if (!list.length) { els.strengths.hidden = true; return; }
+    els.strengths.innerHTML =
+      "<h2>Strengths</h2><ul class=\"strength-list\">" +
+      list.map(function (s) { return "<li>" + esc(s) + "</li>"; }).join("") +
+      "</ul>";
+    els.strengths.hidden = false;
+  }
+
+  function renderRecommendations(recs) {
+    if (!recs.length) { els.recommendations.hidden = true; return; }
+    var html = "<h2>Recommendations</h2>";
+    recs.forEach(function (r) {
+      html += '<div class="rec"><span class="rank">#' + esc(String(r.rank)) + "</span>" +
+        esc(r.action) +
+        (r.resolves ? '<span class="resolves">resolves: ' + esc(r.resolves) + "</span>" : "") +
+        "</div>";
+    });
+    els.recommendations.innerHTML = html;
+    els.recommendations.hidden = false;
+  }
+
+  function renderExperience(exp) {
+    if (!exp) { els.experience.hidden = true; return; }
+    var html = "<h2>Experience</h2>";
+    if (exp.journeys.length) {
+      html += exp.journeys.map(function (j) {
+        return '<div class="journey">' +
+          '<div class="j-name">' + esc(j.name || "(unnamed journey)") + "</div>" +
+          (j.steps ? '<div class="j-steps">' + esc(j.steps) + "</div>" : "") +
+          "</div>";
+      }).join("");
+    }
+    if (exp.headless) {
+      html += '<dl class="kv" style="margin-top:12px"><dt>Headless</dt><dd>' +
+        esc(exp.headless) + "</dd></dl>";
+    }
+    els.experience.innerHTML = html;
+    els.experience.hidden = false;
+  }
+
+  function renderNoFindings() {
+    els.root.innerHTML =
+      '<div class="no-findings">' +
+      '<div class="big">No findings</div>' +
+      "<div>The scanners returned a clean pass for this subject.</div>" +
+      "</div>";
+  }
+
+  function findingNode(f) {
+    var node = document.createElement("div");
+    node.className = "finding sev-" + f.severity;
+    node.setAttribute("data-id", f.id);
+
+    var sub =
+      esc(f.lens) +
+      (f.location ? ' · <span class="mono">' + esc(f.location) + "</span>" : "");
+
+    var rows =
+      "<dt>Lens</dt><dd>" + esc(f.lens) + "</dd>" +
+      (f.location ? "<dt>Location</dt><dd><code>" + esc(f.location) + "</code></dd>" : "") +
+      (f.evidence ? "<dt>Evidence</dt><dd>" + esc(f.evidence) + "</dd>" : "") +
+      (f.recommendation ? "<dt>Recommendation</dt><dd>" + esc(f.recommendation) + "</dd>" : "") +
+      (f.proposed_smallest ? "<dt>Proposed smallest</dt><dd>" + esc(f.proposed_smallest) + "</dd>" : "") +
+      (f.predicted_delta ? "<dt>Predicted delta</dt><dd>" + esc(f.predicted_delta) + "</dd>" : "");
+
+    node.innerHTML =
+      '<div class="row">' +
+      '<input type="checkbox" class="chk" aria-label="Select finding">' +
+      '<div class="head">' +
+      '<div class="title">' + esc(f.title) + "</div>" +
+      '<div class="sub">' + sub + "</div>" +
+      "</div>" +
+      '<span class="tag">' + SEV_LABEL[f.severity] + "</span>" +
+      '<span class="caret">▸</span>' +
+      "</div>" +
+      '<div class="body"><dl>' + rows + "</dl></div>";
+
+    var chk = node.querySelector(".chk");
+    chk.checked = !!selected[f.id];
+    chk.addEventListener("change", function () {
+      if (chk.checked) { selected[f.id] = true; } else { delete selected[f.id]; }
+      updateSelection();
+    });
+
+    var head = node.querySelector(".head");
+    var caret = node.querySelector(".caret");
+    function toggle() { node.classList.toggle("open"); }
+    head.addEventListener("click", toggle);
+    caret.addEventListener("click", toggle);
+
+    return node;
+  }
+
+  function renderFindings(list) {
+    els.root.innerHTML = "";
+    if (list.length === 0) {
+      renderNoFindings();
+      els.toolbar.hidden = true;
+      return;
+    }
+    els.toolbar.hidden = false;
+
+    SEVERITIES.forEach(function (sev) {
+      var group = list.filter(function (f) { return f.severity === sev; });
+      if (group.length === 0) { return; }
+      var wrap = document.createElement("div");
+      wrap.className = "group";
+      var h = document.createElement("h2");
+      h.innerHTML = '<span class="dot ' + sev + '"></span>' + SEV_LABEL[sev] + " (" + group.length + ")";
+      wrap.appendChild(h);
+      group.forEach(function (f) { wrap.appendChild(findingNode(f)); });
+      els.root.appendChild(wrap);
+    });
+  }
+
+  function updateSelection() {
+    var n = Object.keys(selected).length;
+    els.selCount.textContent = n + " selected";
+    els.btnCopy.disabled = n === 0;
+  }
+
+  function composePrompt() {
+    var picked = findings.filter(function (f) { return selected[f.id]; });
+    if (picked.length === 0) { return ""; }
+    var lines = standardsPreamble();
+    lines.push("Fix the following issues in " + subjectPath + ":");
+    lines.push("");
+    picked.forEach(function (f, i) {
+      lines.push((i + 1) + ". " + f.title);
+      if (f.location) { lines.push("   Location: " + f.location); }
+      if (f.evidence) { lines.push("   Evidence: " + f.evidence); }
+      if (f.recommendation) { lines.push("   Recommendation: " + f.recommendation); }
+      if (f.proposed_smallest) { lines.push("   Proposed smallest: " + f.proposed_smallest); }
+      lines.push("");
+    });
+    return lines.join("\n").replace(/\n+$/, "\n");
+  }
+
+  function showToast(text) {
+    els.toast.textContent = text;
+    els.toast.classList.add("show");
+    setTimeout(function () { els.toast.classList.remove("show"); }, 1600);
+  }
+
+  function fallbackCopy(text) {
+    els.fallbackText.value = text;
+    els.fallback.classList.add("show");
+    els.fallbackText.focus();
+    els.fallbackText.select();
+    try {
+      var ok = document.execCommand && document.execCommand("copy");
+      if (ok) {
+        showToast("Copied");
+        return;
+      }
+    } catch (e) { /* fall through to manual */ }
+    showToast("Copy the text shown below");
+  }
+
+  function copyText(text) {
+    if (!text) { return; }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(
+        function () { showToast("Copied"); },
+        function () { fallbackCopy(text); }
+      );
+    } else {
+      fallbackCopy(text);
+    }
+  }
+
+  function doCopy() {
+    copyText(composePrompt());
+  }
+
+  function wireToolbar() {
+    els.btnCopy.addEventListener("click", doCopy);
+    els.btnSelectAll.addEventListener("click", function () {
+      findings.forEach(function (f) { selected[f.id] = true; });
+      document.querySelectorAll(".finding .chk").forEach(function (c) { c.checked = true; });
+      updateSelection();
+    });
+    els.btnClear.addEventListener("click", function () {
+      selected = Object.create(null);
+      document.querySelectorAll(".finding .chk").forEach(function (c) { c.checked = false; });
+      els.fallback.classList.remove("show");
+      updateSelection();
+    });
+    els.btnExpandAll.addEventListener("click", function () {
+      document.querySelectorAll(".finding").forEach(function (n) { n.classList.add("open"); });
+    });
+    els.btnCollapseAll.addEventListener("click", function () {
+      document.querySelectorAll(".finding").forEach(function (n) { n.classList.remove("open"); });
+    });
+  }
+
+  function init() {
+    var island = document.getElementById("report-data");
+    var parsed;
+    try {
+      if (!island) { throw new Error("report-data island element not found"); }
+      parsed = JSON.parse(island.textContent);
+    } catch (err) {
+      showBanner(
+        "Could not parse the report data island.\n\n" +
+        "Error: " + (err && err.message ? err.message : String(err)) + "\n\n" +
+        "The findings could not be rendered. The JSON inside the " +
+        'report-data island (the application/json script tag) is malformed.'
+      );
+      return;
+    }
+
+    var data = normalize(parsed);
+
+    if (data.subject === PLACEHOLDER_SUBJECT) {
+      els.subject.textContent = data.subject;
+      showBanner(
+        "This is the unfilled report shell.\n\n" +
+        "The report-data island still carries the placeholder subject, so " +
+        "there are no findings here. Generate a real report with " +
+        "scripts/render_report.py."
+      );
+      return;
+    }
+
+    findings = data.findings;
+    subjectPath = data.subject;
+    standards = data.standards;
+    findingsById = Object.create(null);
+    findings.forEach(function (f) { findingsById[f.id] = f; });
+
+    renderOverview(data);
+    renderThemes(data.themes);
+    renderStrengths(data.strengths);
+    renderRecommendations(data.recommendations);
+    renderExperience(data.experience);
+    renderFindings(findings);
+    wireToolbar();
+    updateSelection();
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+document_output_language: English
+output_folder: '{project-root}/_bmad-output'
+srm:
+  name: Skills Repo Manager
+  description: Maps external skill repositories into the project as prefixed, BMad-structured
+    skills. Syncs sources via git pull (never modifies sources), adapts foreign layouts
+    — flat skill dirs, Claude plugin dirs, BMad source modules — into BMad conventions,
+    and prunes stale mappings.
+  version: 1.0.0
+  default_selected: false
+  skills_repo_root: C:\Core\Businesses\Skills Repo
+  git_pull: 'yes'

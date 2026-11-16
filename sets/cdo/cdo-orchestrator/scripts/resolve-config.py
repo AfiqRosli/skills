@@ -28,6 +28,7 @@ Exit codes: 0=ok, 2=runtime error
 
 import argparse
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -81,6 +82,37 @@ def load_yaml(path: Path) -> dict:
 
 PATH_KEYS = {"orchestration_dir", "sprint_status_path", "story_location", "devlog_dir"}
 
+# Core keys are canonical in the TOML layers on BMAD v6.12+ (config.toml /
+# custom/config.toml / config.user.toml / custom/config.user.toml), resolved
+# by the installer's own _bmad/scripts/resolve_config.py. YAML config.yaml /
+# config.user.yaml remain the module-section contract (cdo: etc.) and the
+# fallback when the resolver is absent. TOML wins for the keys it carries.
+_CENTRAL_KEYS = [
+    "core.user_name",
+    "core.communication_language",
+    "core.document_output_language",
+]
+
+
+def load_central(root: Path) -> dict:
+    """Core config via the installer's TOML resolver. Returns {flat_key: value};
+    empty dict when _bmad/scripts/resolve_config.py is missing or fails —
+    callers fall back to the YAML reads."""
+    script = root / "_bmad" / "scripts" / "resolve_config.py"
+    if not script.is_file():
+        return {}
+    cmd = ["uv", "run", str(script), "--project-root", str(root)]
+    for k in _CENTRAL_KEYS:
+        cmd += ["--key", k]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if proc.returncode != 0:
+            return {}
+        data = json.loads(proc.stdout)
+    except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+        return {}
+    return {k.rsplit(".", 1)[-1]: v for k, v in data.items() if isinstance(v, str)}
+
 
 def resolve(key, value, root: Path):
     """Return (raw, resolved-abs-path-or-None). Path-type keys resolve relative
@@ -104,12 +136,13 @@ def main():
 
     shared = load_yaml(root / "_bmad" / "config.yaml")
     user = load_yaml(root / "_bmad" / "config.user.yaml")
+    central = load_central(root)
     cdo = shared.get("cdo") if isinstance(shared.get("cdo"), dict) else {}
 
     out = {"installed": bool(cdo), "config": {}, "resolved_paths": {}}
 
     for key, default in CORE_DEFAULTS.items():
-        out["config"][key] = user.get(key, shared.get(key, default))
+        out["config"][key] = central.get(key) or user.get(key, shared.get(key, default))
 
     for key, default in DEFAULTS.items():
         value = cdo.get(key, default)

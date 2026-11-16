@@ -1,0 +1,67 @@
+# Department manifest — merged into {orchestration_dir}/capabilities.yaml.
+
+dept: cdo-growth
+label: Growth & Content Office
+backlog: content          # backlogs/content.md — the publishing queue
+
+capabilities:
+
+  # inbound-only intake — shipped work is the source material. Scan the
+  # ledger for done/verified stories not yet represented in the content
+  # backlog and enqueue them as unaligned items.
+  feed:
+    entry: cdo-growth
+    consumes: flow-ledger.yaml done/verified stories
+    produces: unaligned content.md items (feed.py)
+
+  # author content for confirmed content items — posts, guides, updates.
+  # The wondelai marketing/messaging frameworks are the craft sources.
+  produce:
+    entry: cdo-growth
+    consumes: confirmed content item + its source story's evidence
+    produces: content/{key}/ artifact files
+    delegates-when-installed:
+      - bmad-agent-tech-writer       # technical writing delegate when present
+      - wdl-storybrand-messaging     # narrative structure
+      - wdl-made-to-stick            # memorable framing
+      - wdl-contagious               # why-work-spreads angles (also feeds triage)
+      - wdl-one-page-marketing       # lean marketing plans
+      - wdl-influence-psychology     # persuasion principles
+      - wdl-hooked-ux                # habit-loop content
+      - wdl-grow-app                 # growth journeys
+      - wdl-grow-business
+      - wdl-grow-website
+      - wdl-predictable-revenue      # pipeline content
+      - wdl-cro-methodology          # conversion-framed pieces
+      - wdl-scorecard-marketing      # metrics-backed content
+      - wdl-improve-retention        # retention narratives
+      - wdl-web-typography           # content craft detail
+
+  # the editorial calendar — what's published, queued, scheduled
+  calendar:
+    entry: cdo-growth
+    consumes: content backlog + published state
+    produces: content/calendar.md maintained
+
+  # office-hours — open-ended domain questions; advisory + read-only.
+  # No backlog/pipeline writes — journals to {orchestration_dir}/consult/.
+  consult:
+    entry: cdo-growth
+    consumes: open question or topic — no backlog item required
+    produces: advice + dated consult note in {orchestration_dir}/consult/growth.md
+    delegates-when-installed:
+      - bmad-agent-tech-writer  # writing craft
+      - wdl-storybrand-messaging  # narrative structure
+      - wdl-made-to-stick  # memorable framing
+      - wdl-contagious  # why-work-spreads
+      - wdl-one-page-marketing  # lean plans
+      - wdl-influence-psychology  # persuasion
+      - wdl-hooked-ux  # habit loops
+      - wdl-grow-app
+      - wdl-grow-business
+      - wdl-grow-website
+      - wdl-predictable-revenue  # pipeline
+      - wdl-cro-methodology  # conversion
+      - wdl-scorecard-marketing  # metrics
+      - wdl-improve-retention  # retention
+      - wdl-web-typography  # craft

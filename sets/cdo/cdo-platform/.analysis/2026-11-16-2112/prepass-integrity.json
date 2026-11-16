@@ -1,0 +1,55 @@
+{
+  "scanner": "workflow-integrity-prepass",
+  "script": "prepass-workflow-integrity.py",
+  "version": "1.0.0",
+  "skill_path": "C:\\Core\\Businesses\\skills\\sets\\cdo\\cdo-platform",
+  "timestamp": "2026-11-16T13:12:34.752147+00:00",
+  "status": "pass",
+  "metadata": {
+    "frontmatter": {
+      "name": "cdo-platform",
+      "description": "Platform & Release Engineering \u2014 ships verified work to the configured lane (never self-approving production), runs credential/env coverage checks, and performs abort-safe rollback. Use when the user requests to \"ship this\", \"deploy\", \"check env vars\", \"roll back a story\", or runs release capabilities of the cdo pipeline."
+    },
+    "sections": [
+      {
+        "level": 2,
+        "title": "Overview",
+        "line": 8
+      },
+      {
+        "level": 2,
+        "title": "Role",
+        "line": 14
+      },
+      {
+        "level": 2,
+        "title": "On Activation",
+        "line": 18
+      },
+      {
+        "level": 2,
+        "title": "Capability Routing",
+        "line": 26
+      }
+    ],
+    "workflow_type": "simple-workflow"
+  },
+  "stage_summary": {
+    "total_stages": 0,
+    "referenced": [],
+    "actual": [],
+    "missing_stages": [],
+    "orphaned_stages": []
+  },
+  "prompt_details": [],
+  "issues": [],
+  "summary": {
+    "total_issues": 0,
+    "by_severity": {
+      "critical": 0,
+      "high": 0,
+      "medium": 0,
+      "low": 0
+    }
+  }
+}

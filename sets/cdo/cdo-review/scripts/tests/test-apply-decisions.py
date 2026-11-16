@@ -781,6 +781,212 @@ class TestApplyDecisions(unittest.TestCase):
             proc, _ = run_apply(orch, [{"key": "S1", "verdict": "maybe"}])
             self.assertEqual(proc.returncode, 1)
 
+
+class TestMockAssetLifecycle(unittest.TestCase):
+    """Mock assets (`alignment/drafts/assets/{key}/mock.html` — staged by
+    file-cards.py at filing) must move with the card through every
+    lifecycle hop: archive, park, resurface, unpark/supersede. An
+    orphaned mock is a dead link on the card that cites it."""
+
+    def _seed_mock(self, orch: Path, key: str,
+                   content="<html>mock</html>"):
+        adir = orch / "alignment" / "drafts" / "assets" / key
+        adir.mkdir(parents=True, exist_ok=True)
+        (adir / "mock.html").write_text(content, encoding="utf-8")
+        return adir
+
+    def test_confirm_archives_assets_with_card(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            self._seed_mock(orch, "S1")
+            proc, data = run_apply(orch, [{"key": "S1", "verdict": "confirm"}])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            moved = list((orch / "alignment").glob(
+                "20*/*/*/assets/S1/mock.html"))
+            self.assertEqual(len(moved), 1)
+            self.assertEqual(moved[0].read_text(encoding="utf-8"),
+                             "<html>mock</html>")
+            self.assertFalse(
+                (orch / "alignment" / "drafts" / "assets" / "S1").exists())
+            applied = next(a for a in data["applied"] if a["key"] == "S1")
+            self.assertIn("assets_moved", applied)
+
+    def test_reject_also_archives_assets(self):
+        """A rejected card's mock is evidence too — it archives, not
+        orphans."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            self._seed_mock(orch, "S1")
+            proc, data = run_apply(orch, [{
+                "key": "S1", "verdict": "reject", "note": "no",
+            }])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertEqual(len(list((orch / "alignment").glob(
+                "20*/*/*/assets/S1/mock.html"))), 1)
+
+    def test_defer_parks_assets_with_card(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            self._seed_mock(orch, "S1")
+            proc, data = run_apply(orch, [{"key": "S1", "verdict": "defer"}])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue(
+                (orch / "alignment" / "parked" / "assets" / "S1"
+                 / "mock.html").is_file())
+            self.assertFalse(
+                (orch / "alignment" / "drafts" / "assets" / "S1").exists())
+            applied = next(a for a in data["applied"] if a["key"] == "S1")
+            self.assertIn("assets_moved", applied)
+
+    def test_resurface_returns_assets_to_drafts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            self._seed_mock(orch, "S1")
+            run_apply(orch, [{"key": "S1", "verdict": "defer"}])
+            proc, data = run_apply(orch,
+                                   [{"key": "S1", "verdict": "resurface"}])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue(
+                (orch / "alignment" / "drafts" / "assets" / "S1"
+                 / "mock.html").is_file())
+            self.assertFalse(
+                (orch / "alignment" / "parked" / "assets" / "S1").exists())
+
+    def test_resurface_live_draft_supersedes_parked_assets(self):
+        """Live draft outranks the parked copy — its assets follow the
+        parked card into superseded/, never overwriting draft assets."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            self._seed_mock(orch, "S1", "<html>v1</html>")
+            run_apply(orch, [{"key": "S1", "verdict": "defer"}])
+            # a fresh draft + its own mock land while S1 is parked
+            (orch / "alignment" / "drafts" / "S1.md").write_text(
+                "# fresh draft v2\n", encoding="utf-8")
+            self._seed_mock(orch, "S1", "<html>v2</html>")
+            proc, data = run_apply(orch,
+                                   [{"key": "S1", "verdict": "resurface"}])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            # parked (v1) assets superseded; live (v2) assets untouched
+            snaps = list((orch / "alignment" / "superseded")
+                         .glob("S1.*.assets/mock.html"))
+            self.assertEqual(len(snaps), 1)
+            self.assertEqual(snaps[0].read_text(encoding="utf-8"),
+                             "<html>v1</html>")
+            self.assertEqual(
+                (orch / "alignment" / "drafts" / "assets" / "S1"
+                 / "mock.html").read_text(encoding="utf-8"),
+                "<html>v2</html>")
+
+    def test_unpark_supersedes_assets_with_card(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            self._seed_mock(orch, "S1")
+            run_apply(orch, [{"key": "S1", "verdict": "defer"}])
+            proc, data = run_apply(orch,
+                                   [{"key": "S1", "verdict": "unpark"}])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            snaps = list((orch / "alignment" / "superseded")
+                         .glob("S1.*.assets/mock.html"))
+            self.assertEqual(len(snaps), 1)
+            self.assertFalse(
+                (orch / "alignment" / "parked" / "assets" / "S1").exists())
+
+    def test_no_assets_no_assets_moved_key(self):
+        """Non-UI card — nothing to move, no noise in the result."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            proc, data = run_apply(orch, [{"key": "S1", "verdict": "confirm"}])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            applied = next(a for a in data["applied"] if a["key"] == "S1")
+            self.assertNotIn("assets_moved", applied)
+
+    def _seed_card_with_mock(self, orch: Path, key: str):
+        """A draft whose Mock line cites its drafts assets — the shape
+        file-cards.py writes. The line must track the assets at every
+        hop or it cites a dead path."""
+        self._seed_mock(orch, key)
+        (orch / "alignment" / "drafts" / f"{key}.md").write_text(
+            "# card\n## Visual Preview\n\n"
+            "- **Wireframe:** https://wiretext.app/w/abc\n"
+            f"- **Mock:** alignment/drafts/assets/{key}/mock.html\n",
+            encoding="utf-8")
+
+    def test_confirm_retargets_mock_line_to_archive(self):
+        """The citing line moves with the files — a confirmed card never
+        hands Dev Notes a drafts/ path that no longer exists."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            self._seed_card_with_mock(orch, "S1")
+            proc, data = run_apply(orch, [{"key": "S1", "verdict": "confirm"}])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            moved = next((orch / "alignment").glob(
+                "20*/*/*/assets/S1/mock.html"))
+            rel = moved.relative_to(orch).as_posix()
+            archived = next((orch / "alignment").glob("20*/*/*/S1.md"))
+            body = archived.read_text(encoding="utf-8")
+            self.assertIn(f"- **Mock:** {rel}", body)
+            self.assertNotIn("alignment/drafts/assets", body)
+
+    def test_defer_retargets_mock_line_to_parked(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            self._seed_card_with_mock(orch, "S1")
+            proc, data = run_apply(orch, [{"key": "S1", "verdict": "defer"}])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            body = (orch / "alignment" / "parked" / "S1.md").read_text(
+                encoding="utf-8")
+            self.assertIn(
+                "- **Mock:** alignment/parked/assets/S1/mock.html", body)
+
+    def test_resurface_retargets_mock_line_back_to_drafts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            self._seed_card_with_mock(orch, "S1")
+            run_apply(orch, [{"key": "S1", "verdict": "defer"}])
+            proc, data = run_apply(orch,
+                                   [{"key": "S1", "verdict": "resurface"}])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            body = (orch / "alignment" / "drafts" / "S1.md").read_text(
+                encoding="utf-8")
+            self.assertIn(
+                "- **Mock:** alignment/drafts/assets/S1/mock.html", body)
+
+    def test_unpark_retargets_mock_line_to_superseded(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            self._seed_card_with_mock(orch, "S1")
+            run_apply(orch, [{"key": "S1", "verdict": "defer"}])
+            proc, data = run_apply(orch,
+                                   [{"key": "S1", "verdict": "unpark"}])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            snap = next((orch / "alignment" / "superseded")
+                        .glob("S1.*.md"))
+            body = snap.read_text(encoding="utf-8")
+            self.assertIn(".assets/mock.html", body)
+            self.assertNotIn("alignment/parked/assets", body)
+
+    def test_blocked_assets_warn_and_line_stays_truthful(self):
+        """A stale dest dir blocks the move — the warning says so and
+        the Mock line keeps citing the still-true source path."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            self._seed_card_with_mock(orch, "S1")
+            (orch / "alignment" / "parked" / "assets" / "S1").mkdir(
+                parents=True)  # stale dir blocks the defer move
+            proc, data = run_apply(orch, [{"key": "S1", "verdict": "defer"}])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            applied = next(a for a in data["applied"] if a["key"] == "S1")
+            self.assertNotIn("assets_moved", applied)
+            self.assertIn("already exists", applied.get("warning", ""))
+            body = (orch / "alignment" / "parked" / "S1.md").read_text(
+                encoding="utf-8")
+            # the files never moved — the line still cites drafts/, truly
+            self.assertIn(
+                "- **Mock:** alignment/drafts/assets/S1/mock.html", body)
+            self.assertTrue(
+                (orch / "alignment" / "drafts" / "assets" / "S1"
+                 / "mock.html").is_file())
+
     def test_nonstring_verdict_isolates_not_crashes(self):
         """A malformed verdict (unhashable/non-string) must isolate as an
         invalid line — `x not in {set}` on a list raises TypeError and

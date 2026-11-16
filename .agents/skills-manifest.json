@@ -5,10 +5,54 @@
       "package": "skills",
       "version": "0.1.0",
       "source": "github:AfiqRosli/skills",
-      "installedAt": "2026-11-16T06:27:50.468Z",
+      "installedAt": "2026-11-16T15:11:52.313Z",
       "skills": [
         "srm-setup",
         "srm-sync"
+      ]
+    },
+    "cdo": {
+      "package": "skills",
+      "version": "0.1.0",
+      "source": "github:AfiqRosli/skills",
+      "installedAt": "2026-11-16T15:11:51.963Z",
+      "skills": [
+        "cdo-academy",
+        "cdo-align",
+        "cdo-alignment-uncommitted-changes",
+        "cdo-batch",
+        "cdo-code-e2e",
+        "cdo-continuity",
+        "cdo-delivery",
+        "cdo-distillator",
+        "cdo-docs",
+        "cdo-documentation",
+        "cdo-eng",
+        "cdo-git-pr-message",
+        "cdo-git-push",
+        "cdo-git-quick-push",
+        "cdo-growth",
+        "cdo-handoff",
+        "cdo-orchestrator",
+        "cdo-platform",
+        "cdo-product",
+        "cdo-quality",
+        "cdo-review",
+        "cdo-review-implement-refinement",
+        "cdo-security-audit-uncommitted-changes",
+        "cdo-setup",
+        "cdo-version-change-for-production",
+        "cdo-version-upgrade",
+        "cdo-watch"
+      ]
+    },
+    "scaffold": {
+      "package": "skills",
+      "version": "0.1.0",
+      "source": "github:AfiqRosli/skills",
+      "installedAt": "2026-11-16T15:11:52.933Z",
+      "skills": [
+        "project-greenfield-scaffold"
       ]
     }
   }

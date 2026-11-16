@@ -1,0 +1,74 @@
+# Department manifest — merged into {orchestration_dir}/capabilities.yaml.
+
+dept: cdo-platform
+label: Platform & Release Engineering
+backlog: platform         # backlogs/platform.md
+
+capabilities:
+
+  # land verified work on the lane's local integration ref (cdo-lane).
+  # `ship_target: preview` is the only lane in authority — production ships
+  # file Deploy Sign-offs. Landing is LOCAL: the origin push is the `push`
+  # capability, gated by the Operator's Pre-deploy Sign-offs.
+  # wdl-release-it IS this dept's doctrine (Nygard: production resilience).
+  ship:
+    entry: cdo-platform
+    consumes: verified story (ledger status verified)
+    produces: landed outcome → ledger + ship journal entry (lane_sha)
+    delegates-when-installed:
+      - wdl-release-it    # production-readiness patterns
+      - wdl-improve-app   # deploy-hardening framing
+
+  # the pre-deploy publish — signed ## Pre-deploy Sign-offs items push the
+  # newest signed lane commit to origin/{lane} in one push (one remote
+  # build per sign-off, not one per story). The only origin pusher.
+  push:
+    entry: cdo-platform
+    consumes: Operator-signed Pre-deploy Sign-offs (pre_deploy.signed_at)
+    produces: origin/{lane} publish + stories.{key}.pushed stamps
+
+  # credential logistics — which externals are real, which are TEMP-CDO
+  # placeholders, what's still requisitioned
+  env-check:
+    entry: cdo-platform
+    consumes: .env + card externals + requisitions
+    produces: coverage report JSON (env-scan.py)
+
+  # abort-safe revert of shipped work — git revert the story's merge,
+  # journal the rollback
+  rollback:
+    entry: cdo-platform
+    consumes: shipped story key + target
+    produces: revert commit + rollback journal
+    delegates-when-installed:
+      - wdl-release-it    # stability/antifragility patterns for the revert plan
+
+  # sprint-boundary migration — the OTHER half of release bookkeeping.
+  # An Operator "start a new sprint" directive partitions non-done stories
+  # into the new sprint's artifacts (epics doc, sprint yaml, spec folder)
+  # and archives the old ones. Deploys never trigger it — mid-sprint
+  # deploys are cdo-version-change-for-production's job.
+  version-upgrade:
+    entry: cdo-platform
+    consumes: Operator sprint-start directive + release-train.json + sprint artifacts
+    produces: migrated sprint-status-*.yaml + epics-beta-*.md + spec folder
+    delegates-when-installed:
+      - cdo-version-upgrade   # the migration workflow — this capability IS the delegation
+
+  # Dispatch target — a confirmed platform item (env fix, deploy hardening,
+  # infra task) is work to execute within the item's own authority lane.
+  produce:
+    entry: cdo-platform
+    consumes: confirmed platform item card
+    produces: executed platform work + outcome journaled to ledger
+
+  # office-hours — open-ended domain questions; advisory + read-only.
+  # No backlog/pipeline writes — journals to {orchestration_dir}/consult/.
+  consult:
+    entry: cdo-platform
+    consumes: open question or topic — no backlog item required
+    produces: advice + dated consult note in {orchestration_dir}/consult/platform.md
+    delegates-when-installed:
+      - wdl-release-it  # release/ops resilience
+      - wdl-improve-app  # app health
+      - netlify  # deploy platform — advisory only

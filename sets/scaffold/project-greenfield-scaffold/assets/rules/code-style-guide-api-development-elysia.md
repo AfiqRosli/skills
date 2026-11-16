@@ -1,7 +1,3 @@
----
-trigger: always_on
----
-
 # API Development with Elysia
 
 ## Overview

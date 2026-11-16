@@ -48,7 +48,7 @@ var e = 2.718
 const EULER = 2.718
 ```
 
-**Why this approach:** how the change solves the problem — the mechanism, not a restatement of the diff. Name the convention, pattern, or constraint that drove it (link the rule file where one applies, e.g. `.devin/rules/code-style-guide-naming-conventions.md`).
+**Why this approach:** how the change solves the problem — the mechanism, not a restatement of the diff. Name the convention, pattern, or constraint that drove it (link the rule file where one applies, e.g. `docs/rules/code-style-guide-naming-conventions.md`).
 **Alternatives considered:** the genuine option space around this decision — see the flavors below.
 **Watch out for:** gotchas, edge cases, or follow-ups a reader should know (e.g. "shared `loading` ref is used by two fetches — a second call would flicker state").
 ````

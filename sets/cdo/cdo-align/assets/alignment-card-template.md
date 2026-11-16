@@ -64,14 +64,23 @@ grounded_against:
 
 ## Visual Preview
 
-<!-- The wiretext URL the Operator opens to check the design off WITH the
-     card — a confirmed card's URL is the pre-approved design; the
-     pipeline's wireframe gate reuses it instead of re-asking. The wire
-     reproduces the touched surface's CURRENT layout and marks the delta —
-     a sketch the Operator can't hold against the live page is commentary,
-     not design. Non-UI items fill `n/a — no UI surface`. -->
+<!-- The artifacts the Operator opens to check the design off WITH the
+     card — a confirmed card's wireframe URL is the pre-approved design;
+     the pipeline's wireframe gate reuses it instead of re-asking. The wire
+     frames the touched surface(s) in browser chrome and draws the to-be
+     in place — a sketch the Operator can't hold against the live page is
+     commentary, not design. The mock is the visual-fidelity companion:
+     same grounded read, real design tokens, self-contained HTML.
+     Standards live in the cdo-align skill — references/wireframe.md and
+     references/design-mock.md. The filer owns the Mock line — pass the
+     file (or directory) as `mock` in the filing JSON.
+     Backend items wire/mock the consumer surface's new state (the field
+     a component renders, the state a lifecycle implies, the affordance
+     a permission toggles). `n/a — no UI surface` only when NO surface
+     reflects the change — justify it in Flags, don't default to it. -->
 
-- **Wireframe:** {https://wiretext.app/w/… | `n/a — no UI surface` | `unavailable — wiretext MCP absent`}
+- **Wireframe:** {https://wiretext.app/w/… | `n/a — no UI surface` | `unavailable — {reason}`}
+- **Mock:** {alignment/drafts/assets/{key}/mock.html | alignment/drafts/assets/{key}/mock/ | `n/a — no UI surface` | `unavailable — {reason}`}
 
 ## Questions for the Operator
 
@@ -121,7 +130,8 @@ grounded_against:
      the scope implies more than one dispatch arc (per the drafter's
      sizing-flags guidance), `axis-trip:{axis}` when a strategic axis trips
      (any trip is Needs Attention by structure), `ungrounded:{store}` when
-     a grounding source was missing. -->
+     a grounding source was missing — including `ungrounded:design-tokens`
+     when the mock fell back to placeholder styling. -->
 
 - {flag}: {why uncertain} — resolves if {condition}
 

@@ -40,12 +40,22 @@ PAIRS = {
     "code-git-quick-push": "cdo-git-quick-push",
     "code-git-pr-message": "cdo-git-pr-message",
     "code-version-change-for-production": "cdo-version-change-for-production",
+    "project-version-upgrade": "cdo-version-upgrade",
 }
 
 # vendored → original, longest-first so cdo-git-quick-push normalizes
 # before cdo-git-push
 _V2O = dict((v, k) for k, v in PAIRS.items())
 _VENDORED_NAMES = sorted(PAIRS.values(), key=len, reverse=True)
+
+# secondary files diffed per pair: (original rel-path, vendored rel-path).
+# Pairs whose workflow content lives outside SKILL.md would otherwise be
+# invisible to the drift check (the bulk of a carved skill's content).
+SECONDARY = {
+    "project-version-upgrade": [
+        ("workflow.md", "references/workflow.md"),
+    ],
+}
 
 
 def _normalize(text: str) -> str:
@@ -78,9 +88,17 @@ def _pair_status(original: Path, vendored: Path) -> dict:
 def check_forks(root: Path) -> list:
     out = []
     for original, vendored in PAIRS.items():
-        out.append(_pair_status(
+        entry = _pair_status(
             root / ".devin" / "skills" / original / "SKILL.md",
-            root / ".agents" / "skills" / vendored / "SKILL.md"))
+            root / ".agents" / "skills" / vendored / "SKILL.md")
+        entry["file"] = "SKILL.md"
+        out.append(entry)
+        for o_rel, v_rel in SECONDARY.get(original, []):
+            sub = _pair_status(
+                root / ".devin" / "skills" / original / o_rel,
+                root / ".agents" / "skills" / vendored / v_rel)
+            sub["file"] = o_rel
+            out.append(sub)
     return out
 
 

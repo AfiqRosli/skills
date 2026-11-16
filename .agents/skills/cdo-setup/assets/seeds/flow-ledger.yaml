@@ -1,0 +1,30 @@
+# Portfolio Flow Ledger — batch-level state across stories and sessions.
+# This is the CDO's situational dashboard; per-story detail lives in devlogs.
+
+batch:
+  id: null            # active batch identifier
+  started: null
+  manifest: []        # ordered backlog items for the batch
+
+pool:
+  confirmed: []       # Operator-aligned items eligible for dispatch
+  quarantined: []     # blocked/deferred items with reasons
+
+stories: {}           # key -> {status, step, step_started, session, attempts, findings}
+                      # status enum: queued | in-flight | done | verified |
+                      #              shipped | blocked | killed | quarantined |
+                      #              deferred
+                      # verified = cdo-quality audit pass; release-eligible
+                      # shipped  = promoted to configured lane (ship_target)
+
+cost:
+  budget: null        # batch_budget from config
+  burned: 0
+
+autonomy:
+  enabled: false      # earned_autonomy config toggle
+  streak: 0           # consecutive Operator confirmations >=95% confidence
+  threshold: 10       # streak needed for self-approval of routine items
+                      # any correction resets streak to 0
+
+signals: []           # watchdog + LINE_STOP events awaiting triage

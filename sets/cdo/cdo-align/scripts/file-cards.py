@@ -26,11 +26,16 @@ Usage:
       [--attention-threshold 80] [--dry-run] [-o result.json]
 
 Cards JSON: [{"key","title","backlog","confidence","flags":[...],
-              "asks": 0, "body": "...", "wireframe": "https://wiretext.app/w/…"}]
+              "asks": 0, "body": "...", "wireframe": "https://wiretext.app/w/…",
+              "mock": "/path/to/mock.html"}]
 `asks` is derived from the card's Questions section; a supplied count that
 disagrees warns and the derived count wins — a card's asks>0 → Needs Attention.
 `wireframe` is optional — when absent, a wiretext URL is recovered from the
-card body's Visual Preview section if present. Cards declaring a non-`none`
+card body's Visual Preview section if present. `mock` is optional — a path to
+a produced HTML mock (file or directory), staged under
+`alignment/drafts/assets/{key}/` with the card's `**Mock:**` line set to the
+staged path; relative paths anchor to the --cards file's directory; a
+missing path degrades to `unavailable` with a warning, never fatal. Cards declaring a non-`none`
 `## Execution Surface` also route to Needs Attention — a declared risk
 surface is an Operator-eyeball item by definition (and ineligible for self-approve).
 Contract checks that can't be trusted to the prompt layer are enforced here:
@@ -50,23 +55,29 @@ Exit codes: 0=ok, 1=validation error, 2=runtime error
 import argparse
 import json
 import re
+import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
 
 import yaml
 
+from cardlayout import (  # noqa: E402 — vendored card-layout contract
+    MOCK_VALUE_RE, RISK_TOKENS, retarget_mock, superseded_assets)
+from cardlayout import section as _section  # noqa: E402
+from cardlayout import set_mock_line as _set_mock_line  # noqa: E402
+
 ENTRY_RE = re.compile(r"^- \[ \] (?P<key>\S+?) — ")
 FM_RE = re.compile(r"\A---\n(.*?)\n---\n", re.S)
 KEY_RE = re.compile(r"^[A-Za-z0-9][\w.-]*$")
 WIRETEXT_RE = re.compile(r"https://wiretext\.app/w/[A-Za-z0-9_-]+")
-# Gate-bypass tokens (a confirmed card pre-clears those dispatch gates):
-#   schema-migration, deps-changed
-# Attention-only tokens (route to Needs Attention; gates still apply):
-#   env-changed, api-contract, data-backfill
-RISK_TOKENS = {"none", "schema-migration", "deps-changed",
-               "env-changed", "api-contract", "data-backfill"}
+# Gate-bypass tokens live in cardlayout.RISK_TOKENS (a confirmed card
+# pre-clears schema-migration/deps-changed; the rest only route).
 COSIGN_RE = re.compile(r"P&D co-sign:", re.I)
+EXTERNAL_REF_RE = re.compile(
+    r"(?:src|href)\s*=\s*[\"']https?://|@import|url\(\s*[\"']?https?://",
+    re.I)
+PLACEHOLDER_TOKEN = "placeholder styling"
 
 
 def _find_project_root(start: Path) -> Path:
@@ -74,15 +85,6 @@ def _find_project_root(start: Path) -> Path:
         if (p / "_bmad").is_dir():
             return p
     return start
-
-
-def _section(body: str, name: str) -> str:
-    m = re.search(rf"^## {re.escape(name)}\s*$", body or "", flags=re.M)
-    if not m:
-        return ""
-    rest = body[m.end():]
-    nxt = re.search(r"^## ", rest, flags=re.M)
-    return rest[:nxt.start()] if nxt else rest
 
 
 def _risk_tokens(body: str):
@@ -188,6 +190,101 @@ def _wireframe_url(card: dict):
     return (m.group(0) if m else None), warn
 
 
+def _mock_health(src_path: Path, warnings: list, key: str):
+    """Mechanical floor for the renderable artifact — existence is already
+    proven; here we warn on files that don't look like a self-contained
+    HTML mock (empty/tiny, no HTML structure, external asset refs).
+    Warn-only, never blocks — same posture as every optional artifact."""
+    try:
+        head = src_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        warnings.append(f"{key}: mock staged but unreadable — "
+                        "couldn't verify it opens")
+        return ""
+    if len(head.strip()) < 200 or "<html" not in head.lower() \
+            and "<!doctype" not in head.lower():
+        warnings.append(f"{key}: mock doesn't look like an HTML file — "
+                        "verify it opens from file:// before review")
+    elif EXTERNAL_REF_RE.search(head):
+        warnings.append(f"{key}: mock references external assets "
+                        "(http/CDN) — the file contract is self-contained")
+    return head
+
+
+def _mock_plan(card: dict, warnings: list, cards_dir: Path, orch: Path):
+    """Resolve the card's `mock` payload into (src_path, staged_rel).
+    Sets the body's `**Mock:**` line to the deterministic staged path —
+    `alignment/drafts/assets/{key}/mock.html` for a file, or
+    `alignment/drafts/assets/{key}/mock/` for a directory — or
+    `unavailable — {reason}` when the supplied path doesn't exist
+    (warned, never fatal; same posture as the wireframe).
+    A body that claims a mock path while the payload carries none is
+    existence-checked and degraded, never trusted. Relative `mock` paths
+    anchor to the --cards file's directory, not the process CWD.
+    Returns (None, None) when nothing stages. The copy happens later,
+    after any supersede snapshot has moved the old assets away."""
+    key = card["key"]
+    body = card.get("body") or ""
+    src = card.get("mock")
+    if not src:
+        # declared-but-not-staged: the card's Mock line claims a path the
+        # payload didn't supply — existence-check the claim or degrade it
+        mm = MOCK_VALUE_RE.search(_section(body, "Visual Preview"))
+        if mm:
+            mval = mm.group(1).strip().strip("`")
+            if not mval.startswith(("n/a", "unavailable")):
+                if (orch / mval).exists():
+                    return None, mval  # already staged — line is truthful
+                warnings.append(
+                    f"{key}: card declares mock '{mval}' but no mock was "
+                    "staged — card marked unavailable")
+                card["body"] = _set_mock_line(
+                    body, "unavailable — mock declared but not staged")
+        return None, None
+    src_path = Path(str(src)).expanduser()
+    if not src_path.is_absolute():
+        src_path = cards_dir / src_path
+    if not src_path.exists():
+        warnings.append(f"{key}: mock path '{src}' doesn't exist — "
+                        "card marked unavailable")
+        card["body"] = _set_mock_line(
+            body, f"unavailable — mock file missing: {src}")
+        return None, None
+    if not _section(body, "Visual Preview").strip():
+        warnings.append(f"{key}: mock staged but card has no "
+                        "## Visual Preview section — Mock line not writable")
+    if src_path.is_dir():
+        rel = f"alignment/drafts/assets/{key}/mock/"
+    else:
+        head = _mock_health(src_path, warnings, key)
+        if PLACEHOLDER_TOKEN in head:
+            flags = card.setdefault("flags", [])
+            if isinstance(flags, list) \
+                    and "ungrounded:design-tokens" not in flags:
+                flags.append("ungrounded:design-tokens")
+                warnings.append(
+                    f"{key}: mock uses placeholder styling — flagged "
+                    "ungrounded:design-tokens")
+        rel = f"alignment/drafts/assets/{key}/mock.html"
+    card["body"] = _set_mock_line(body, rel)
+    return src_path, rel
+
+
+def _copy_mock(src_path: Path, key: str, drafts_dir: Path):
+    dest_root = drafts_dir / "assets" / key
+    dest_root.mkdir(parents=True, exist_ok=True)
+    if src_path.is_dir():
+        dest = dest_root / "mock"
+        if src_path.resolve() == dest.resolve():
+            return  # already staged in place
+        shutil.copytree(src_path, dest, dirs_exist_ok=True)
+        return
+    dest = dest_root / "mock.html"
+    if src_path.resolve() == dest.resolve():
+        return  # already staged in place — self-copy would raise
+    shutil.copy2(src_path, dest)
+
+
 def parse_args():
     p = argparse.ArgumentParser(description="File alignment cards into the Operator checklist.")
     p.add_argument("--orchestration-dir", required=True)
@@ -202,14 +299,15 @@ def parse_args():
     return p.parse_args()
 
 
-def checklist_line(card: dict, wire) -> str:
+def checklist_line(card: dict, wire, mock=None) -> str:
     flags = f" | flags: {', '.join(card['flags'])}" if card.get("flags") else ""
     asks = int(card.get("asks") or 0)
     asks_txt = f" | asks: {asks}" if asks else ""
     wire_txt = f" | wire: {wire}" if wire else ""
+    mock_txt = f" | mock: {mock}" if mock else ""
     return (
         f"- [ ] {card['key']} — {card['title']} | conf {card['confidence']}%{flags}{asks_txt}"
-        f"{wire_txt} | draft: alignment/drafts/{card['key']}.md"
+        f"{wire_txt}{mock_txt} | draft: alignment/drafts/{card['key']}.md"
     )
 
 
@@ -361,6 +459,11 @@ def main():
     superseded_dir = orch / "alignment" / "superseded"
     for card in sorted(cards, key=lambda c: int(c.get("confidence", 0))):
         key = card["key"]
+        # resolve + set the Mock line before the body is compared/written —
+        # the staged path must be truthful in the filed draft; the file
+        # copy waits until after any supersede snapshot moves old assets
+        cards_dir = Path(args.cards).resolve().parent
+        mock_src, mock_rel = _mock_plan(card, warnings, cards_dir, orch)
         draft_path = drafts_dir / f"{key}.md"
         if draft_path.is_file() and \
                 draft_path.read_text(encoding="utf-8") != card["body"]:
@@ -368,6 +471,11 @@ def main():
                 superseded_dir.mkdir(parents=True, exist_ok=True)
                 stamp = datetime.now().strftime("%Y-%m-%dT%H%M")
                 draft_path.replace(superseded_dir / f"{key}.{stamp}.md")
+                # keep the mock with the draft it belonged to
+                old_assets = drafts_dir / "assets" / key
+                if old_assets.is_dir():
+                    shutil.move(str(old_assets),
+                                str(superseded_dir / f"{key}.{stamp}.assets"))
         # a fresh draft supersedes a parked card for the same key — the
         # rethink path (unpark) already moves parked→superseded; cover the
         # manual-marker-flip route too so parked/ can't double-file
@@ -375,12 +483,26 @@ def main():
         if parked_path.is_file() and not args.dry_run:
             superseded_dir.mkdir(parents=True, exist_ok=True)
             stamp = datetime.now().strftime("%Y-%m-%dT%H%M")
-            parked_path.replace(
-                superseded_dir / f"{key}.{stamp}.parked.md")
+            # parked mock assets ride along — and the parked card's Mock
+            # line is retargeted so it never cites a dead path
+            parked_assets = orch / "alignment" / "parked" / "assets" / key
+            parked_dest = superseded_assets(
+                superseded_dir, key, stamp, ".parked")
+            body = parked_path.read_text(encoding="utf-8")
+            if parked_assets.is_dir():
+                shutil.move(str(parked_assets), str(parked_dest))
+                body = retarget_mock(
+                    body, key,
+                    parked_dest.relative_to(orch).as_posix())
+            (superseded_dir / f"{key}.{stamp}.parked.md").write_text(
+                body, encoding="utf-8")
+            parked_path.unlink()
             warnings.append(f"{key}: parked card moved to superseded/ — "
                             "fresh draft takes precedence")
         if not args.dry_run:
             draft_path.write_text(card["body"], encoding="utf-8")
+            if mock_src is not None:
+                _copy_mock(mock_src, key, drafts_dir)
 
         wire, warn = _wireframe_url(card)
         if warn:
@@ -423,7 +545,8 @@ def main():
         if not bounds:
             print(json.dumps({"errors": [f"checklist lacks '## {section}' section"]}))
             sys.exit(1)
-        lines = insert_sorted(lines, checklist_line(card, wire), conf, *bounds)
+        lines = insert_sorted(lines, checklist_line(card, wire, mock_rel),
+                              conf, *bounds)
 
         marked = flip_backlog_marker(
             backlog_dir, normalize_backlog(card.get("backlog", "code"), orch),

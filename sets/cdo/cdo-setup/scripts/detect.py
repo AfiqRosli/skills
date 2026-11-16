@@ -170,20 +170,47 @@ def detect_sprint_status(root: Path) -> list:
     return hits
 
 
+def _toml_core_keys(root: Path) -> set:
+    """Core keys present in the TOML layers — canonical on BMAD v6.12+
+    (config.toml installer-managed, custom/*.toml overrides, *.user.toml
+    personal). Read directly; no subprocess, no resolver dependency."""
+    keys = set()
+    try:
+        import tomllib
+    except ImportError:
+        return keys
+    for rel in ("config.toml", "custom/config.toml",
+                "config.user.toml", "custom/config.user.toml"):
+        p = root / "_bmad" / rel
+        if not p.is_file():
+            continue
+        try:
+            data = tomllib.loads(p.read_text(encoding="utf-8"))
+        except (tomllib.TOMLDecodeError, OSError):
+            continue
+        core = data.get("core")
+        if isinstance(core, dict):
+            keys.update(k for k in core if k in NON_MODULE_KEYS)
+    return keys
+
+
 def detect_bmad(root: Path) -> dict:
-    """Parse _bmad/config.yaml properly — top-level dict keys are module sections."""
+    """Parse _bmad/config.yaml properly — top-level dict keys are module sections.
+    Core keys are unioned with the TOML layers (v6.12+ canonical)."""
     config = root / "_bmad" / "config.yaml"
+    toml_present = (root / "_bmad" / "config.toml").exists()
     result = {
-        "installed": config.exists(),
+        "installed": config.exists() or toml_present,
         "modules": [],
         "has_cdo_section": False,
         "prior_cdo_config": {},
         "config_is_stub": False,
         "config_unparseable": False,
         "core_keys_present": [],
-        "toml_config_present": (root / "_bmad" / "config.toml").exists(),
+        "toml_config_present": toml_present,
     }
     if not config.exists():
+        result["core_keys_present"] = sorted(_toml_core_keys(root))
         return result
     try:
         data = yaml.safe_load(config.read_text(encoding="utf-8"))
@@ -195,7 +222,7 @@ def detect_bmad(root: Path) -> dict:
         result["config_is_stub"] = True
         return result
     result["core_keys_present"] = sorted(
-        k for k in NON_MODULE_KEYS if k in data)
+        {k for k in NON_MODULE_KEYS if k in data} | _toml_core_keys(root))
     result["modules"] = sorted(
         k for k, v in data.items()
         if isinstance(v, dict) and k not in NON_MODULE_KEYS
@@ -322,7 +349,7 @@ def main():
     if bmad["installed"] and bmad["config_is_stub"]:
         warnings.append("_bmad/config.yaml exists but has no module sections (stub)")
     if bmad["toml_config_present"]:
-        warnings.append("_bmad/config.toml also present — confirm which config format BMAD reads")
+        warnings.append("_bmad/config.toml also present — TOML carries core keys, YAML carries module sections (v6.12+ dual-format)")
 
     gate_reasons = []
     if not git_ok:

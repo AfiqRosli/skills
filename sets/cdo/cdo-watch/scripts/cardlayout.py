@@ -140,3 +140,101 @@ def card_confidence(body: str):
     """Declared confidence percent — None when absent."""
     m = CONF_RE.search(body or "")
     return int(m.group(1)) if m else None
+
+
+# ---- Visual Preview / mock-assets contract -----------------------------
+# The ONE definition of the Visual Preview line shapes and the
+# assets/{key}/ staging taxonomy — file-cards writes these lines,
+# apply-decisions rewrites them on every lifecycle move, resolve-item
+# parses them. All three must read the same shapes or the pointer rots.
+
+MOCK_FILENAME = "mock.html"
+
+# Line shapes — column-0 anchored on BOTH sides: a stale indented
+# `  - **Mock:**` line must not survive a writer's replace and then win
+# a reader's first-match scan.
+WIREFRAME_VALUE_RE = re.compile(r"^- \*\*Wireframe:\*\*\s*(.+)$", re.M)
+MOCK_LINE_RE = re.compile(r"^- \*\*Mock:\*\*.*$", re.M)
+MOCK_VALUE_RE = re.compile(r"^- \*\*Mock:\*\*\s*(.+)$", re.M)
+
+# Visual Preview status vocabulary — sentinels match by PREFIX; the
+# reason trails the em-dash (`unavailable — mock file missing: …`).
+VP_NO_UI = "n/a — no UI surface"
+VP_UNAVAILABLE = "unavailable — "
+
+# Execution Surface token enum — filing (file-cards) and resolution
+# (resolve-item) share it; a token set that drifts between producer and
+# consumer silently mis-routes.
+RISK_TOKENS = {"none", "schema-migration", "deps-changed",
+               "env-changed", "api-contract", "data-backfill"}
+
+
+def section(body: str, name: str) -> str:
+    """Body of a `## name` section up to the next `## ` — section-scoped
+    card parsing so prose elsewhere never reads as a declaration."""
+    m = re.search(rf"^## {re.escape(name)}\s*$", body or "", flags=re.M)
+    if not m:
+        return ""
+    rest = body[m.end():]
+    nxt = re.search(r"^## ", rest, flags=re.M)
+    return rest[:nxt.start()] if nxt else rest
+
+
+def assets_dir(bay_root: Path, key: str) -> Path:
+    """`{bay}/assets/{key}` — the card's visual-design asset bay, wherever
+    the card sits (drafts/parked/dated-archive/superseded stamp)."""
+    return bay_root / "assets" / key
+
+
+def draft_mock_rel(key: str) -> str:
+    """The orch-relative Mock pointer a freshly filed card carries —
+    file-cards writes it; every move retargets it via retarget_mock."""
+    return f"alignment/drafts/assets/{key}/{MOCK_FILENAME}"
+
+
+def superseded_assets(superseded: Path, key: str, stamp: str,
+                      suffix: str = "") -> Path:
+    """`superseded/{key}.{stamp}[.suffix].assets` — the mock archive that
+    rides beside the frozen card copy."""
+    return superseded / f"{key}.{stamp}{suffix}.assets"
+
+
+def set_mock_line(body: str, text: str) -> str:
+    """Set/replace the `- **Mock:**` line inside `## Visual Preview` —
+    after the Wireframe line when present, else appended to the section.
+    Writers own this line so the cited path stays truthful; a missing
+    section returns the body unchanged (the caller decides the warn).
+    The insert index is guarded — a terminal Wireframe line with no
+    trailing newline can't crash mid-drain."""
+    sec = section(body, "Visual Preview")
+    if not sec:
+        return body
+    line = f"- **Mock:** {text}"
+    new_sec, n = MOCK_LINE_RE.subn(lambda _: line, sec, count=1)
+    if not n:
+        m = WIREFRAME_VALUE_RE.search(new_sec)
+        if m:
+            nl = new_sec.find("\n", m.end())
+            at = (nl + 1) if nl != -1 else len(new_sec)
+            new_sec = new_sec[:at] + line + "\n" + new_sec[at:]
+        else:
+            new_sec = new_sec.rstrip("\n") + "\n" + line + "\n"
+    return body.replace(sec, new_sec, 1)
+
+
+def retarget_mock(body: str, key: str, new_assets_rel: str) -> str:
+    """Re-point the card's Mock line after its assets moved to
+    `{new_assets_rel}` (orch-relative) — preserves the pointer tail
+    (`mock.html`, `mock/` dir, or a named file) across hops. Sentinel
+    values (n/a, unavailable — reason, anything not under assets/{key}/)
+    pass through untouched."""
+    m = MOCK_VALUE_RE.search(body or "")
+    if not m:
+        return body
+    old = m.group(1).strip().strip("`")
+    marker = f"assets/{key}/"
+    if marker not in old:
+        return body
+    tail = old.split(marker, 1)[1]
+    new_val = f"{new_assets_rel}/{tail}" if tail else new_assets_rel
+    return set_mock_line(body, new_val)

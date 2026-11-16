@@ -3,7 +3,8 @@
 # if you know the schema (see srm-sync/references/adaptation.md).
 #
 #   name          display name — also the module label in module-help.csv
-#   url           informational clone URL
+#   url           clone URL — `srm-sync --clone-missing` fetches a missing
+#                 repo from here; leave empty for hand-managed checkouts
 #   path          repo location; may use {skills_repo_root} or {project-root}
 #   prefix        prepended to every mapped skill (user-chosen at add time)
 #   layout        grouped = each skills_path is a BMad module dir

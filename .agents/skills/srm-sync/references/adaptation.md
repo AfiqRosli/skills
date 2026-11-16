@@ -11,7 +11,8 @@ marker.
 ```yaml
 repos:
   - name: BMAD-CYBERSEC                 # display name + help CSV module label
-    url: https://github.com/...git      # informational
+    url: https://github.com/...git      # clone URL — sync --clone-missing fetches
+                                        # a missing repo from here; empty = hand-managed
     path: "{skills_repo_root}/BMAD-CYBERSEC"   # may use {skills_repo_root} / {project-root}
     prefix: bmad-bus                    # user-chosen at `add` time
     layout: grouped                     # grouped | flat

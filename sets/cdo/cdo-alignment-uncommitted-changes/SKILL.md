@@ -563,6 +563,9 @@ echo "🔍 Running pre-commit validation..."
 ## Resources
 
 ### Style Guide Reference (16 Documents)
+
+**Location:** the guides are passive reference docs at `docs/rules/` in the target project — resolve the path via the project's `AGENTS.md` pointer if it differs. Filenames below are relative to that directory.
+
 **Core Development Guides:**
 1. `code-style-guide-vuejs-patterns.md` - Vue 3 component structure
 2. `code-style-guide-store-patterns-pinia.md` - Pinia store architecture

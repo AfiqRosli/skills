@@ -1,7 +1,3 @@
----
-trigger: always_on
----
-
 # Store Patterns (Pinia)
 
 ## Overview
@@ -10,13 +6,13 @@ This document provides comprehensive Pinia store patterns for the application. I
 
 ## Store Architecture
 
-Follow the patterns defined in `.windsurf/skills/pinia/SKILL.md`:
+Apply these Pinia store patterns consistently:
 
 ### Basic Store Structure
 
 ```typescript
 // stores/[feature].ts
-// Note: Nuxt 3 auto-imports defineStore, no manual import needed
+// Note: Nuxt auto-imports defineStore, no manual import needed
 export const use[Feature]Store = defineStore("[feature]", () => {
   // 🔵 State - Use ref()
   const state = ref(initialValue);

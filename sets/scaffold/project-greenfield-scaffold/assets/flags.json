@@ -2,7 +2,7 @@
   "$schema_note": "Module flags consumed by scaffold.py. Modules default ON; --skip <module> turns one off; --minimal expands to its listed skips. requires = a disabled module force-disables its dependents (cascade OFF, reported). excluded_paths are removed from the rendered tree; stripped deps/scripts/scripts-blocks come from versions.json + // @flag markers.",
   "modules": {
     "core":   { "description": "Nuxt + Vuetify + Pinia + Elysia + TS + SCSS/BEM + ESLint", "always": true },
-    "rules":  { "description": ".devin/rules code-style-guide set" },
+    "rules":  { "description": "docs/rules code-style-guide set + AGENTS.md pointer" },
     "tests":  { "description": "Vitest + Playwright + test scripts" },
     "db":     { "description": "Drizzle ORM + Neon Postgres" },
     "auth":   { "description": "better-auth + auth schema/client/middleware", "requires": ["db"] },
@@ -18,7 +18,7 @@
     "minimal": ["auth", "billing", "db", "email", "redis", "sentry", "seo", "docs", "deploy"]
   },
   "excluded_paths": {
-    "rules":  [".devin"],
+    "rules":  ["docs/rules"],
     "tests":  ["vitest.config.ts", "playwright.config.ts", "tests"],
     "db":     ["drizzle.config.ts", "drizzle", "server/db"],
     "auth":   ["auth.ts", "auth-schema.ts", "lib/auth-client.ts", "middleware/auth.global.ts", "pages/sign-in.vue", "pages/register.vue", "server/auth.ts", "stores/AuthStore.ts"],

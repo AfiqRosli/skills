@@ -1,0 +1,73 @@
+# Department manifest — merged into {orchestration_dir}/capabilities.yaml by
+# cdo-quality setup. The CDO reads capabilities.yaml to discover what each
+# installed department can do.
+
+dept: cdo-quality
+label: Quality Engineering
+backlog: quality          # backlogs/quality.md — seeded on install
+
+capabilities:
+
+  # The audit leg — delivered work checked against the alignment card's
+  # acceptance criteria. Dispatch doesn't end at "code written".
+  verify:
+    entry: cdo-quality
+    consumes: delivered story result + its archived alignment card
+    produces: "verdict {verified | findings | failed} journaled to the ledger"
+    delegates-when-installed:
+      - wdl-improve-code-quality   # code-quality bar criteria
+      - wdl-ux-heuristics          # UX-surface audits
+      - wdl-ios-hig-design         # design-conformance checks
+      - wdl-high-perf-browser      # performance-surface audits
+
+  # Security audit checks — delegated wholesale to the BMAD-CYBERSEC
+  # cybersec-team module (synced via srm). We never re-implement security
+  # review; we route to the specialists.
+  security-audit:
+    entry: cdo-quality
+    consumes: story/module/surface to audit
+    produces: findings → story record; critical findings → signals inbox (LINE_STOP-class)
+    delegates-when-installed:
+      - bmad-bus-cybersec-team-security-architecture-review   # design-level audit
+      - bmad-bus-cybersec-team-web-app-security-testing       # web app pentest
+      - bmad-bus-cybersec-team-api-security-expert            # API surface
+      - bmad-bus-cybersec-team-llm-ai-security-expert         # LLM/AI surface
+      - bmad-bus-cybersec-team-vulnerability-management       # vuln triage flow
+      - bmad-bus-cybersec-team-penetration-tester             # offensive red team
+      - bmad-bus-cybersec-team-infrastructure-security-testing # infra layer
+      - bmad-bus-cybersec-team-compliance-audit-prep          # compliance surface
+
+  # In-flight drift benchmarking — is the running work still inside the card's
+  # scope boundary? The "drift-watch" the duty officer triages on.
+  drift-check:
+    entry: cdo-quality
+    consumes: in-flight story state + its alignment card
+    produces: "{aligned | drifting — evidence} signal for duty-officer triage"
+
+  # Dispatch target — a confirmed quality item IS work (a test suite to write,
+  # an audit to run, a coverage gap to close). Executes through verify/audit
+  # as the item's card specifies.
+  produce:
+    entry: cdo-quality
+    consumes: confirmed quality item card
+    produces: executed QA work + verdict journaled to ledger
+
+  # office-hours — open-ended domain questions; advisory + read-only.
+  # No backlog/pipeline writes — journals to {orchestration_dir}/consult/.
+  consult:
+    entry: cdo-quality
+    consumes: open question or topic — no backlog item required
+    produces: advice + dated consult note in {orchestration_dir}/consult/quality.md
+    delegates-when-installed:
+      - wdl-improve-code-quality
+      - wdl-ux-heuristics
+      - wdl-ios-hig-design
+      - wdl-high-perf-browser
+      - bmad-bus-cybersec-team-security-architecture-review
+      - bmad-bus-cybersec-team-web-app-security-testing
+      - bmad-bus-cybersec-team-api-security-expert
+      - bmad-bus-cybersec-team-llm-ai-security-expert
+      - bmad-bus-cybersec-team-vulnerability-management
+      - bmad-bus-cybersec-team-penetration-tester
+      - bmad-bus-cybersec-team-infrastructure-security-testing
+      - bmad-bus-cybersec-team-compliance-audit-prep

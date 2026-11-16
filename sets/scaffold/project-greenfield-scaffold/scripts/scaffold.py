@@ -10,8 +10,9 @@ Copies assets/template/ → TARGET, substituting {{PROJECT_NAME}},
 {{PROJECT_SLUG}}, and {{SITE_URL}} tokens; removes // @flag <module>
 blocks for disabled modules; drops excluded paths; renders package.json
 dependencies from assets/versions.json minus flag-stripped deps; and
-copies assets/rules/ → TARGET/.devin/rules unless the rules module is
-off.
+copies assets/rules/ → TARGET/docs/rules unless the rules module is
+off (passive reference docs; discoverability comes from the emitted
+AGENTS.md pointer, not always-on rule injection).
 
 Modules (all ON by default): core, rules, tests, db, auth, billing,
 email, redis, sentry, seo, docs, deploy. Disable with --skip <module>
@@ -200,12 +201,12 @@ def scaffold(target: Path, name: str, site_url: str, enabled: set[str], flags: d
         written.append(rel.as_posix())
         log(f"  wrote {rel}", verbose)
 
-    # Rules set → .devin/rules
+    # Rules set → docs/rules (passive docs; AGENTS.md carries the pointer)
     if "rules" in enabled and RULES_DIR.is_dir():
         for src in sorted(RULES_DIR.rglob("*")):
             if src.is_dir():
                 continue
-            rel = Path(".devin/rules") / src.relative_to(RULES_DIR)
+            rel = Path("docs/rules") / src.relative_to(RULES_DIR)
             dest = target / rel
             dest.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(src, dest)

@@ -46,8 +46,16 @@ class TestScaffold(unittest.TestCase):
             self.assertIn("https://acme.example.com", nuxt)
             self.assertNotIn("@flag", nuxt)
 
-            # rules copied
-            self.assertTrue((target / ".devin/rules/code-style-guide.md").exists())
+            # rules copied to docs/rules as passive docs (no .devin/rules)
+            self.assertTrue((target / "docs/rules/code-style-guide.md").exists())
+            self.assertFalse((target / ".devin").exists())
+            guide = (target / "docs/rules/code-style-guide.md").read_text()
+            self.assertNotIn("trigger:", guide)
+
+            # AGENTS.md emitted with the rules pointer
+            agents = (target / "AGENTS.md").read_text()
+            self.assertIn("docs/rules/code-style-guide.md", agents)
+            self.assertNotIn("@flag", agents)
 
     def test_minimal(self):
         with tempfile.TemporaryDirectory() as td:
@@ -61,7 +69,10 @@ class TestScaffold(unittest.TestCase):
             self.assertFalse((target / "auth.ts").exists())
             self.assertFalse((target / "server/db").exists())
             self.assertFalse((target / "netlify.toml").exists())
-            self.assertFalse((target / "docs").exists())
+            # docs site module off — but rules module stays on under --minimal,
+            # so docs/ exists holding only the rules subtree
+            self.assertFalse((target / "docs/index.md").exists())
+            self.assertTrue((target / "docs/rules/code-style-guide.md").exists())
             self.assertTrue((target / "vitest.config.ts").exists())
 
             pkg = json.loads((target / "package.json").read_text())
@@ -104,6 +115,15 @@ class TestScaffold(unittest.TestCase):
             self.assertEqual(status["status"], "pass")
             self.assertTrue(status["key_files"]["package.json"])
             self.assertFalse(status["key_files"]["node_modules"])
+
+    def test_skip_rules(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "proj"
+            run_scaffold(target, "--skip", "rules")
+            self.assertFalse((target / "docs/rules").exists())
+            agents = (target / "AGENTS.md").read_text()
+            self.assertNotIn("docs/rules", agents)
+            self.assertNotIn("@flag", agents)
 
     def test_skip_tests(self):
         with tempfile.TemporaryDirectory() as td:

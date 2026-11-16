@@ -53,6 +53,14 @@ Invalid verdicts are collected into `invalid` — the rest still apply (one bad
 item never aborts the Operator's whole pass). Confirm on a checklist line with
 no draft card warns rather than silently pooling nothing.
 
+Mock assets (`alignment/drafts/assets/{key}/` — design-mock HTML staged at
+filing) move with the card through every lifecycle hop: archive →
+`{YYYY/MM/DD}/assets/{key}/`, defer → `parked/assets/{key}/`, resurface →
+back to `drafts/assets/{key}/`, unpark/resurface-superseded →
+`superseded/{key}.{stamp}.assets/`. The card's `**Mock:**` line is
+retargeted to the real destination at each hop — a moved card never
+cites a path its assets no longer live at.
+
 Usage:
   uv run apply-decisions.py --orchestration-dir /path/docs/orchestration
       --decisions decisions.json [--config /path/_bmad/config.yaml]
@@ -66,6 +74,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from datetime import datetime, timezone
@@ -80,7 +89,7 @@ except ImportError:
 
 from cardlayout import (  # noqa: E402 — vendored card-layout contract
     CHECKBOX_KEY_RE, CONF_RE, card_backlog, card_title, confirmed_card,
-    grounded_commit, grounding_stale, head_sha)
+    grounded_commit, grounding_stale, head_sha, retarget_mock)
 
 VERDICTS = {"confirm", "confirm-edited", "reject", "defer", "granted",
             "blocked", "resurface", "unpark"}
@@ -112,6 +121,30 @@ def parse_args():
 def stamp() -> tuple:
     n = datetime.now(timezone.utc)
     return n.strftime("%Y-%m-%d"), n.strftime("%H:%M")
+
+
+def move_assets(src: Path, dest: Path, orch: Path,
+                warnings: Optional[list] = None):
+    """Move a card's mock-assets dir ({orch-rel} .../assets/{key}/) to
+    `dest`, keeping the mock paired with the card through park / archive /
+    supersede. Returns the dest's orch-relative path or None — no assets
+    is the normal case (non-UI card, or mock never produced). A blocked
+    destination warns instead of silently stranding the files — the
+    card's Mock line stays truthful only if the move actually happened."""
+    if not src.is_dir():
+        return None
+    if dest.exists():
+        if warnings is not None:
+            warnings.append(
+                f"mock assets stayed at {src.relative_to(orch).as_posix()}"
+                f" — {dest.relative_to(orch).as_posix()} already exists")
+        return None
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(src), str(dest))
+    try:
+        return dest.relative_to(orch).as_posix()
+    except ValueError:
+        return str(dest)
 
 
 def checklist_apply(lines: list, key: str, verdict: str, date: str,
@@ -347,13 +380,35 @@ def handle_resurface(orch: Path, proj_root: Path, checklist: list,
         superseded = orch / "alignment" / "superseded"
         superseded.mkdir(parents=True, exist_ok=True)
         stamp_s = datetime.now().strftime("%Y-%m-%dT%H%M")
-        parked.replace(superseded / f"{key}.{stamp_s}.md")
+        mw = []
+        moved = move_assets(
+            orch / "alignment" / "parked" / "assets" / key,
+            superseded / f"{key}.{stamp_s}.assets", orch, mw)
+        if moved:
+            body = retarget_mock(body, key, moved)
+            result["assets_moved"] = moved
+        (superseded / f"{key}.{stamp_s}.md").write_text(
+            body, encoding="utf-8")
+        parked.unlink()
+        if mw:
+            result["warning"] = " ".join(mw) + " "
         result["superseded"] = f"alignment/superseded/{key}.{stamp_s}.md"
         result["warning"] = ("a live draft already exists — the parked "
                              "card moved to superseded/ instead")
     else:
         draft.parent.mkdir(parents=True, exist_ok=True)
-        parked.replace(draft)
+        mw = []
+        moved = move_assets(
+            orch / "alignment" / "parked" / "assets" / key,
+            orch / "alignment" / "drafts" / "assets" / key, orch, mw)
+        if moved:
+            body = retarget_mock(body, key, moved)
+            result["assets_moved"] = moved
+        draft.write_text(body, encoding="utf-8")
+        parked.unlink()
+        if mw:
+            result["warning"] = (result.get("warning", "") +
+                                 " " + " ".join(mw)).strip()
         result["resurfaced"] = f"alignment/drafts/{key}.md"
         section, base = deferred_line(checklist, key)
         if base:
@@ -392,7 +447,18 @@ def handle_unpark(orch: Path, checklist: list, backlog_dir: Path,
     superseded = orch / "alignment" / "superseded"
     superseded.mkdir(parents=True, exist_ok=True)
     stamp_s = datetime.now().strftime("%Y-%m-%dT%H%M")
-    parked.replace(superseded / f"{key}.{stamp_s}.md")
+    mw = []
+    moved = move_assets(
+        orch / "alignment" / "parked" / "assets" / key,
+        superseded / f"{key}.{stamp_s}.assets", orch, mw)
+    if moved:
+        body = retarget_mock(body, key, moved)
+        result["assets_moved"] = moved
+    (superseded / f"{key}.{stamp_s}.md").write_text(body, encoding="utf-8")
+    parked.unlink()
+    if mw:
+        result["warning"] = (result.get("warning", "") +
+                             " " + " ".join(mw)).strip()
     result["superseded"] = f"alignment/superseded/{key}.{stamp_s}.md"
     if flip_backlog(backlog_dir, card_backlog(body), key, " ", note):
         result["backlog"] = "[A]→[ ] — item redrafts on the next align scan"
@@ -466,9 +532,11 @@ def cleanup_dead_worktrees(proj_root: Path, orch: Path,
 def advance_lane_to_tip(proj_root: Path, lane: str) -> dict:
     """Converge the local ship-target branch to cdo-lane at the review
     boundary — the same "preview = shipped, pending deploy" mirror the
-    ship legs maintain. --reconcile checkpoints org-state churn and
-    merges when FF is blocked; a refusal (code-path conflict, staged
-    index) reports only — the verdicts already applied."""
+    ship legs maintain. --reconcile stashes ad-hoc WIP aside (popped
+    back uncommitted after the merge — never checkpointed onto the
+    lane), checkpoints org-state churn, and merges when FF is blocked;
+    a refusal (code-path conflict, staged index) reports only — the
+    verdicts already applied."""
     script = proj_root / ".agents" / "skills" / "cdo-platform" / \
         "scripts" / "advance-lane.py"
     proc = subprocess.run(
@@ -582,13 +650,27 @@ def main():
                 # belong in drafts/ (that says unexamined). Backlog marker
                 # stays [A]: the item is still alignment-pending, dormant.
                 parked.parent.mkdir(parents=True, exist_ok=True)
+                # assets move FIRST so the card's Mock line can be
+                # retargeted to the real destination before it's written —
+                # a parked card must never cite a drafts/ path
+                mw = []
+                body = draft.read_text(encoding="utf-8")
+                moved = move_assets(
+                    orch / "alignment" / "drafts" / "assets" / key,
+                    orch / "alignment" / "parked" / "assets" / key, orch, mw)
+                if moved:
+                    body = retarget_mock(body, key, moved)
+                    result["assets_moved"] = moved
                 parked.write_text(
                     stamp_card(
-                        draft.read_text(encoding="utf-8"),
+                        body,
                         f"deferred {date} {hm} UTC"
                         + (f" — {note}" if note else "")),
                     encoding="utf-8")
                 draft.unlink()
+                if mw:
+                    result["warning"] = (result.get("warning", "") +
+                                         " " + " ".join(mw)).strip()
                 checklist = checklist_apply(
                     checklist, key, "deferred", date, note,
                     sections={"Needs Attention", "Routine Review"})
@@ -630,9 +712,22 @@ def main():
             backlog = backlog_m.group(1).split("/")[-1].replace(".md", "") if backlog_m else "code"
 
             archive_dir.mkdir(parents=True, exist_ok=True)
+            # assets move FIRST so the archived card's Mock line is
+            # retargeted before write — the line must cite the real home,
+            # never the drafts/ path resolve-item would hand to Dev Notes
+            mw = []
+            moved = move_assets(
+                orch / "alignment" / "drafts" / "assets" / key,
+                archive_dir / "assets" / key, orch, mw)
+            if moved:
+                body = retarget_mock(body, key, moved)
+                result["assets_moved"] = moved
             verdict_head = f"<!-- {verdict} {date} {hm} UTC" + (f" — {note}" if note else "") + " -->\n\n"
             (archive_dir / f"{key}.md").write_text(verdict_head + body, encoding="utf-8")
             draft.unlink()
+            if mw:
+                result["warning"] = (result.get("warning", "") +
+                                     " " + " ".join(mw)).strip()
             result["archived"] = f"alignment/{y}/{mth}/{d}/{key}.md"
 
             if pd_installed and "P&D co-sign" not in body:

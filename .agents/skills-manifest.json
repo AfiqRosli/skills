@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "sets": {
+    "srm": {
+      "package": "skills",
+      "version": "0.1.0",
+      "source": "github:AfiqRosli/skills",
+      "installedAt": "2026-11-16T06:27:50.468Z",
+      "skills": [
+        "srm-setup",
+        "srm-sync"
+      ]
+    }
+  }
+}

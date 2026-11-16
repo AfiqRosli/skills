@@ -9,7 +9,7 @@ House skill modules, installable into any project's `.agents/skills` via the exe
 | Bin        | Skills                                                        | Purpose                                        |
 | ---------- | ------------------------------------------------------------- | ---------------------------------------------- |
 | `srm`      | `srm-setup`, `srm-sync`                                       | Skills Repo Manager — maps external skill repos  |
-| `cdo`      | `cdo-*` (26)                                                  | Autonomous Delivery Org — departments + pipeline |
+| `cdo`      | `cdo-*` (27)                                                  | Autonomous Delivery Org — departments + pipeline |
 | `scaffold` | `project-greenfield-scaffold`                                 | Greenfield project scaffold on the house spine   |
 
 ## Install
@@ -49,7 +49,7 @@ Run from your project root. Skills land in `.agents/skills/`; a `.agents/skills-
 Pinned version (recommended for release tags):
 
 ```bash
-bunx -p github:AfiqRosli/skills#v0.1.0 cdo
+bunx -p github:AfiqRosli/skills#v0.2.0 cdo
 ```
 
 ### Flags

@@ -67,6 +67,16 @@ bunx -p github:AfiqRosli/skills#v0.3.0 cdo
 - `cdo` → invoke the `cdo-setup` skill (requires a git repo and an official BMAD install at `_bmad/config.yaml`)
 - `scaffold` → invoke `project-greenfield-scaffold`
 
+## This repo runs the org
+
+The cdo module is installed here — `docs/orchestration/` is the operation's home:
+
+- `backlogs/*.md` — work intake, one queue per department
+- `alignment-checklist.md` — the Operator surface: card reviews, sign-offs, requisitions
+- `flow-ledger.yaml`, `handover.md` — live state; the next session cold-starts from these
+
+Work ships on the `preview` lane; pushes to `origin main` + release tags are Operator-gated (Deploy Sign-offs on the checklist). Talk to `cdo-orchestrator` (Marshal) to run the operation.
+
 ## Authoring & releasing
 
 Edit skills under `sets/<set>/<skill>/`. To add a new set, create `sets/<name>/`, add a `bin/<name>.js` wrapper calling `lib/install.js#run('<name>')`, and register the bin in `package.json`.
@@ -77,5 +87,7 @@ Cut a release:
 node tools/release.mjs patch "what changed"   # or minor | major
 git push --follow-tags origin main
 ```
+
+(Releases are cut on `preview`; the push is the gated publish leg — see Deploy Sign-offs.)
 
 Consumers then pull the new version with `bunx -p github:AfiqRosli/skills#vX.Y.Z <set>` — or unpinned, accepting the runner's cache window.

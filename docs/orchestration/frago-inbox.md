@@ -14,3 +14,8 @@ is timestamped, journaled, and triggers an explicit re-plan.
 ### 2026-11-17 18:49
 "update our release train. we had updated the sets earlier" — routed to
 platform backlog as `platform-01`; alignment card drafted
+→ processed 2026-11-17 19:00 — confirmed, produced inline, v0.3.0 cut on preview
+
+### 2026-11-17 19:02
+"update the readme" — document the installed org (orchestration home,
+preview lane, gated push) in README.md; small doc fix, run inline

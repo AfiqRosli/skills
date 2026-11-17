@@ -11,7 +11,3 @@ A card whose scope implies **more than one dispatch arc** is flagged `oversized`
 
 - `## Suggested Split` block on the card: recommended keys with clean deps (each its own dispatch arc, deps declared).
 - The flag feeds takt: oversized cards that ship anyway show their cost in attempt burn.
-
-## Changelog
-
-- 2026-10-18 — 13-31 introduced (ralph-loop benchmark: one item per loop → one arc per card).

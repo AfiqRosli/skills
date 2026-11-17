@@ -44,20 +44,21 @@ def card(key, conf, flags=None, backlog="code"):
             "confidence": conf, "flags": flags or [], "body": body}
 
 
-class TestFileCards(unittest.TestCase):
-    def make_orch(self, root: Path):
-        orch = root / "docs" / "orchestration"
-        (orch / "backlogs").mkdir(parents=True)
-        (orch / "alignment-checklist.md").write_text(CHECKLIST, encoding="utf-8")
-        (orch / "backlogs" / "code.md").write_text(
-            "- [ ] S1 — first\n- [ ] S2 — second\n- [ ] S3 — third\n",
-            encoding="utf-8",
-        )
-        return orch
+def make_orch(root: Path):
+    orch = root / "docs" / "orchestration"
+    (orch / "backlogs").mkdir(parents=True)
+    (orch / "alignment-checklist.md").write_text(CHECKLIST, encoding="utf-8")
+    (orch / "backlogs" / "code.md").write_text(
+        "- [ ] S1 — first\n- [ ] S2 — second\n- [ ] S3 — third\n",
+        encoding="utf-8",
+    )
+    return orch
 
+
+class TestFileCards(unittest.TestCase):
     def test_files_by_confidence_and_flags(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             proc, data = run_file(orch, [
                 card("S1", 95), card("S2", 40, ["scope-fuzzy"]), card("S3", 70),
             ])
@@ -74,7 +75,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_sorted_ascending_within_section(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             run_file(orch, [card("S3", 70)])
             run_file(orch, [card("S2", 40, ["x"])])
             text = (orch / "alignment-checklist.md").read_text(encoding="utf-8")
@@ -84,7 +85,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_idempotent_refile_replaces(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             run_file(orch, [card("S1", 95)])
             run_file(orch, [card("S1", 60, ["revised"])])  # re-draft lower conf
             text = (orch / "alignment-checklist.md").read_text(encoding="utf-8")
@@ -93,7 +94,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_asks_routes_to_attention(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             c = card("S1", 95)
             c["asks"] = 2
             c["body"] = (c["body"] + "\n- q1? — recommended: a\n"
@@ -112,7 +113,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_wireframe_url_on_checklist_line(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             c = card("S1", 90)
             c["wireframe"] = "https://wiretext.app/w/abc12345"
             run_file(orch, [c])
@@ -121,7 +122,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_wireframe_recovered_from_card_body(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             c = card("S1", 90)
             c["body"] = "# card\n## Visual Preview\n\n- **Wireframe:** https://wiretext.app/w/xyz987\n"
             run_file(orch, [c])
@@ -130,14 +131,14 @@ class TestFileCards(unittest.TestCase):
 
     def test_no_wireframe_no_wire_segment(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             run_file(orch, [card("S1", 90)])
             text = (orch / "alignment-checklist.md").read_text(encoding="utf-8")
             self.assertNotIn("| wire:", text)
 
     def test_wireframe_url_outside_preview_not_recovered(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             c = card("S1", 90)
             c["body"] = ("# card\n## Questions for the Operator\n\n"
                          "- reuse https://wiretext.app/w/old123 ?\n")
@@ -147,7 +148,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_malformed_wireframe_field_warns(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             c = card("S1", 90)
             c["wireframe"] = "see figma"
             proc, data = run_file(orch, [c])
@@ -157,7 +158,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_declared_risk_surface_routes_to_attention(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             c = card("S1", 95)
             c["body"] = ("# card\n## Execution Surface\n\n"
                          "- **Risk surface:** `schema-migration`\n")
@@ -167,7 +168,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_unknown_risk_token_warns(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             c = card("S1", 95)
             c["body"] = ("# card\n## Execution Surface\n\n"
                          "- **Risk surface:** `schema_migration`\n")
@@ -178,7 +179,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_attention_tokens_route_to_attention(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             for key, tok in zip(("S1", "S2", "S3"),
                                 ("env-changed", "api-contract", "data-backfill")):
                 c = card(key, 95)
@@ -190,7 +191,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_snapshot_on_overwrite(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             run_file(orch, [card("S1", 95)])
             old = "# card S1 v1"
             c = card("S1", 60, ["revised"])
@@ -209,7 +210,7 @@ class TestFileCards(unittest.TestCase):
         """A fresh draft for a key whose card sits parked must not leave
         two live cards — the parked one snapshots to superseded/."""
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             parked = orch / "alignment" / "parked"
             parked.mkdir(parents=True)
             (parked / "S1.md").write_text("# parked card\n", encoding="utf-8")
@@ -224,14 +225,14 @@ class TestFileCards(unittest.TestCase):
 
     def test_no_snapshot_when_body_unchanged(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             run_file(orch, [card("S1", 95)])
             run_file(orch, [card("S1", 95)])  # identical refile
             self.assertFalse((orch / "alignment" / "superseded").exists())
 
     def test_frontmatter_surface_mismatch_routes_to_attention(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             c = card("S1", 95)
             c["body"] = ("---\ndeclared_surface: [deps-changed]\n---\n"
                          "# card\n## Execution Surface\n\n"
@@ -243,7 +244,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_missing_execution_surface_warns_and_routes(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             c = card("S1", 95)
             c["body"] = "# card S1 — no sections at all\n"
             proc, data = run_file(orch, [c])
@@ -253,7 +254,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_asks_derived_not_supplied(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             c = card("S1", 95)
             c["asks"] = 0  # lies — the body holds two real questions
             c["body"] = ("# card\n## Questions for the Operator\n\n"
@@ -266,7 +267,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_validation_names_the_bad_card(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             bad = card("S1", 95)
             bad["confidence"] = "95%"  # string with % — classic LLM slip
             proc, data = run_file(orch, [bad, card("S2", 90)])
@@ -279,20 +280,20 @@ class TestFileCards(unittest.TestCase):
 
     def test_duplicate_keys_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             proc, data = run_file(orch, [card("S1", 95), card("S1", 60)])
             self.assertEqual(proc.returncode, 1)
             self.assertTrue(any("duplicate" in e for e in data["errors"]))
 
     def test_filename_hostile_key_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             proc, data = run_file(orch, [card("../evil", 95)])
             self.assertEqual(proc.returncode, 1)
 
     def test_undraftable_flips_to_question_marker(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             payload = {"cards": [card("S1", 90)],
                        "undraftable": [{"key": "S2", "backlog": "code",
                                         "reason": "no legible intent"}]}
@@ -305,7 +306,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_question_marker_flips_to_aligned_on_filing(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             b = orch / "backlogs" / "code.md"
             b.write_text(b.read_text(encoding="utf-8").replace(
                 "- [ ] S2", "- [?] S2"), encoding="utf-8")
@@ -314,7 +315,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_gaps_and_last_run_written(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             payload = {"cards": [card("S1", 90)],
                        "gaps": ["no card covers the registration gap"]}
             proc, data = run_file(orch, payload)
@@ -324,10 +325,26 @@ class TestFileCards(unittest.TestCase):
             last = json.loads((orch / "alignment" / "last-run.json")
                               .read_text(encoding="utf-8"))
             self.assertEqual(last["filed"], ["S1"])
+            # advisory next-leg pointer — filed cards mean a checklist to review
+            self.assertEqual(data["suggest"], "cdo-review")
+            self.assertEqual(last["suggest"], "cdo-review")
+
+    def test_no_suggest_when_nothing_filed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            payload = {"cards": [], "undraftable": [
+                {"key": "S2", "reason": "no legible intent",
+                 "backlog": "code"}]}
+            proc, data = run_file(orch, payload)
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertNotIn("suggest", data)
+            last = json.loads((orch / "alignment" / "last-run.json")
+                              .read_text(encoding="utf-8"))
+            self.assertNotIn("suggest", last)
 
     def test_dry_run_writes_nothing(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             proc, data = run_file(orch, [card("S1", 90)], ["--dry-run"])
             self.assertTrue(data["dry_run"])
             self.assertFalse((orch / "alignment" / "drafts").exists())
@@ -337,7 +354,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_mock_staged_and_mock_line_set(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             mock_src = Path(tmp) / "mock.html"
             mock_src.write_text("<html><body>mock</body></html>",
                                 encoding="utf-8")
@@ -364,7 +381,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_mock_replaces_existing_mock_line(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             mock_src = Path(tmp) / "mock.html"
             mock_src.write_text("<html></html>", encoding="utf-8")
             c = card("S1", 90)
@@ -383,7 +400,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_mock_missing_file_warns_and_marks_unavailable(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             c = card("S1", 90)
             c["body"] = ("# card\n## Visual Preview\n\n"
                          "- **Wireframe:** n/a\n\n"
@@ -403,14 +420,14 @@ class TestFileCards(unittest.TestCase):
 
     def test_no_mock_no_mock_segment(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             run_file(orch, [card("S1", 90)])
             text = (orch / "alignment-checklist.md").read_text(encoding="utf-8")
             self.assertNotIn("| mock:", text)
 
     def test_mock_dry_run_writes_nothing(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             mock_src = Path(tmp) / "mock.html"
             mock_src.write_text("<html></html>", encoding="utf-8")
             c = card("S1", 90)
@@ -421,7 +438,7 @@ class TestFileCards(unittest.TestCase):
 
     def test_supersede_moves_mock_assets_with_draft(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             mock_src = Path(tmp) / "mock.html"
             mock_src.write_text("<html>v1</html>", encoding="utf-8")
             c = card("S1", 95)
@@ -447,14 +464,14 @@ class TestFileCards(unittest.TestCase):
 
     def test_backlog_marker_flips(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             run_file(orch, [card("S1", 90)])
             backlog = (orch / "backlogs" / "code.md").read_text(encoding="utf-8")
             self.assertIn("- [A] S1", backlog)
             self.assertIn("- [ ] S2", backlog)
 
 
-class TestMockStagingEdges(TestFileCards):
+class TestMockStagingEdges(unittest.TestCase):
     """Hostile-environment edges on the mock staging contract — the
     script owns the Mock line, so every divergent input must degrade
     deterministically rather than desync card, checklist, and disk."""
@@ -474,7 +491,7 @@ class TestMockStagingEdges(TestFileCards):
 
     def test_mock_directory_stages_as_dir(self):
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             mockdir = Path(tmp) / "mocks"
             mockdir.mkdir()
             (mockdir / "list.html").write_text(
@@ -498,7 +515,7 @@ class TestMockStagingEdges(TestFileCards):
         """Prompt layer stages the mock at the dest path itself and passes
         it — self-copy must be a no-op, never a mid-drain crash."""
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             dest = (orch / "alignment" / "drafts" / "assets" / "S1"
                     / "mock.html")
             dest.parent.mkdir(parents=True)
@@ -518,7 +535,7 @@ class TestMockStagingEdges(TestFileCards):
         not the process CWD the script happened to launch from."""
         with tempfile.TemporaryDirectory() as tmp, \
                 tempfile.TemporaryDirectory() as cdir:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             mock_file = Path(cdir) / "mock.html"
             mock_file.write_text(
                 "<html><body>" + "x" * 300 + "</body></html>",
@@ -540,7 +557,7 @@ class TestMockStagingEdges(TestFileCards):
         """Card claims a mock path but the payload supplies none — the
         claim is existence-checked and degraded, never trusted."""
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             c = self._vp_card(
                 "S1", 95,
                 mock_line="alignment/drafts/assets/S1/mock.html")
@@ -556,7 +573,7 @@ class TestMockStagingEdges(TestFileCards):
     def test_declared_mock_already_staged_passes(self):
         """Claim + real file on disk (pre-staged) → line kept, no warn."""
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             dest = (orch / "alignment" / "drafts" / "assets" / "S1"
                     / "mock.html")
             dest.parent.mkdir(parents=True)
@@ -577,7 +594,7 @@ class TestMockStagingEdges(TestFileCards):
         """Placeholder styling must surface as a flag — a quiet
         placeholder that routes Routine defeats the flag's purpose."""
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             mock_src = Path(tmp) / "mock.html"
             mock_src.write_text(
                 "<!-- placeholder styling — no design tokens found -->\n"
@@ -597,7 +614,7 @@ class TestMockStagingEdges(TestFileCards):
         """A mock full of CDN links violates the file contract — warn,
         never block."""
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             mock_src = Path(tmp) / "mock.html"
             mock_src.write_text(
                 "<html><head>"
@@ -616,7 +633,7 @@ class TestMockStagingEdges(TestFileCards):
         """Wireframe as the body's last line with no trailing newline —
         the Mock insert must not crash mid-drain."""
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             mock_src = Path(tmp) / "mock.html"
             mock_src.write_text("<html><body>" + "x" * 300 +
                                 "</body></html>", encoding="utf-8")
@@ -629,12 +646,220 @@ class TestMockStagingEdges(TestFileCards):
             self.assertIn(
                 "- **Mock:** alignment/drafts/assets/S1/mock.html", body)
 
+    def test_wire_with_na_mock_flags_missing(self):
+        """Wire produced + Mock `n/a` is a contradiction — a wire proves
+        a UI surface; flag mock-missing, route Needs Attention."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            c = self._vp_card("S1", 95, mock_line="n/a — no UI surface")
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue(any("n/a" in w and "wire" in w
+                                for w in data["warnings"]))
+            self.assertIn("S1", data["needs_attention"])
+            text = (orch / "alignment-checklist.md").read_text(
+                encoding="utf-8")
+            self.assertIn("mock-missing", text)
+
+    def test_wire_with_no_mock_line_flags_missing(self):
+        """Wire produced + no Mock line at all — the drafter filed before
+        finishing Visual Preview; flag mock-missing."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            c = self._vp_card("S1", 95)
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue(any("`absent`" in w
+                                for w in data["warnings"]))
+            self.assertIn("S1", data["needs_attention"])
+            text = (orch / "alignment-checklist.md").read_text(
+                encoding="utf-8")
+            self.assertIn("mock-missing", text)
+
+    def test_wire_with_unavailable_mock_no_flag(self):
+        """`unavailable — {reason}` beside a wire is an honest claim —
+        files clean at high confidence, no mock-missing flag."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            c = self._vp_card(
+                "S1", 95,
+                mock_line="unavailable — editor crashed mid-write")
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertIn("S1", data["routine"])
+            text = (orch / "alignment-checklist.md").read_text(
+                encoding="utf-8")
+            self.assertNotIn("mock-missing", text)
+
+    def test_wire_payload_without_preview_section_flags(self):
+        """A `wireframe` payload field on a card with no Visual Preview
+        section — no parseable Mock line means an undeclared skip."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            c = card("S1", 95)
+            c["wireframe"] = "https://wiretext.app/w/abc123"
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertIn("S1", data["needs_attention"])
+            text = (orch / "alignment-checklist.md").read_text(
+                encoding="utf-8")
+            self.assertIn("mock-missing", text)
+
+    def test_no_wire_na_mock_no_flag(self):
+        """Honest non-UI card — both sentinels n/a, nothing produced —
+        nothing to flag."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            c = card("S1", 95)
+            c["body"] += ("\n## Visual Preview\n\n"
+                          "- **Wireframe:** n/a — no UI surface\n"
+                          "- **Mock:** n/a — no UI surface\n")
+            proc, data = run_file(orch, [c])
+            self.assertIn("S1", data["routine"])
+
+    def test_mock_with_na_wire_flags_missing(self):
+        """Mirror direction: a staged mock beside Wireframe `n/a` — the
+        mock proves a UI surface; flag wire-missing."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            mock_src = Path(tmp) / "mock.html"
+            mock_src.write_text(
+                "<html><body>" + "x" * 300 + "</body></html>",
+                encoding="utf-8")
+            c = card("S1", 95)
+            c["body"] += ("\n## Visual Preview\n\n"
+                          "- **Wireframe:** n/a — no UI surface\n")
+            c["mock"] = str(mock_src)
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue(any("wire-missing" in w or "mock produced"
+                                in w for w in data["warnings"]))
+            self.assertIn("S1", data["needs_attention"])
+            text = (orch / "alignment-checklist.md").read_text(
+                encoding="utf-8")
+            self.assertIn("wire-missing", text)
+
+    def test_mock_with_absent_wire_flags_missing(self):
+        """Staged mock on a card with no Wireframe line at all — the
+        wire was skipped, not declined; flag wire-missing."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            mock_src = Path(tmp) / "mock.html"
+            mock_src.write_text(
+                "<html><body>" + "x" * 300 + "</body></html>",
+                encoding="utf-8")
+            c = card("S1", 95)
+            c["body"] += "\n## Visual Preview\n\n"
+            c["mock"] = str(mock_src)
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertIn("S1", data["needs_attention"])
+            text = (orch / "alignment-checklist.md").read_text(
+                encoding="utf-8")
+            self.assertIn("wire-missing", text)
+
+    def test_unavailable_wire_na_mock_flags_missing(self):
+        """An `unavailable` wire was *attempted* — attempting presupposes
+        a surface, so Mock `n/a` beside it still flags mock-missing."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            c = card("S1", 95)
+            c["body"] += ("\n## Visual Preview\n\n"
+                          "- **Wireframe:** unavailable — wiretext MCP "
+                          "absent\n- **Mock:** n/a — no UI surface\n")
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertIn("S1", data["needs_attention"])
+            text = (orch / "alignment-checklist.md").read_text(
+                encoding="utf-8")
+            self.assertIn("mock-missing", text)
+
+    def test_unavailable_wire_real_mock_no_flag(self):
+        """Wire failed honestly, mock produced — the consistent state:
+        no flag either direction."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            mock_src = Path(tmp) / "mock.html"
+            mock_src.write_text(
+                "<html><body>" + "x" * 300 + "</body></html>",
+                encoding="utf-8")
+            c = card("S1", 95)
+            c["body"] += ("\n## Visual Preview\n\n"
+                          "- **Wireframe:** unavailable — wiretext MCP "
+                          "absent\n")
+            c["mock"] = str(mock_src)
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertIn("S1", data["routine"])
+            text = (orch / "alignment-checklist.md").read_text(
+                encoding="utf-8")
+            self.assertNotIn("-missing", text)
+
+    def test_oversized_signal_auto_flagged(self):
+        """size `full` + ≥3 distinct touches dirs trips `oversized`
+        deterministically — an undeclared card gets flagged."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            c = card("S1", 95)
+            c["body"] = (
+                "---\ntouches: [server/, stores/, components/]\n---\n"
+                "# card\n- **Sizing:** full\n\n"
+                "## Execution Surface\n\n- **Risk surface:** `none`\n")
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertTrue(any("oversized" in w
+                                for w in data["warnings"]))
+            self.assertIn("S1", data["needs_attention"])
+            text = (orch / "alignment-checklist.md").read_text(
+                encoding="utf-8")
+            self.assertIn("oversized", text)
+
+    def test_oversized_declared_no_double_flag(self):
+        """A card that already carries `oversized` gets no warning and
+        no duplicate flag."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            c = card("S1", 95, ["oversized"])
+            c["body"] = (
+                "---\ntouches: [server/, stores/, components/]\n---\n"
+                "# card\n- **Sizing:** full\n\n"
+                "## Execution Surface\n\n- **Risk surface:** `none`\n")
+            proc, data = run_file(orch, [c])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertFalse(any("trips" in w
+                                 for w in data.get("warnings", [])))
+            text = (orch / "alignment-checklist.md").read_text(
+                encoding="utf-8")
+            self.assertEqual(text.count("oversized"), 1)
+
+    def test_lite_sizing_and_few_touches_no_flag(self):
+        """`lite` sizing (or `full` with <3 touches) doesn't trip the
+        countable signal — interpretive cases stay prompt-side."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            lite = card("S1", 95)
+            lite["body"] = (
+                "---\ntouches: [server/, stores/, components/]\n---\n"
+                "# card\n- **Sizing:** lite\n\n"
+                "## Execution Surface\n\n- **Risk surface:** `none`\n")
+            small = card("S2", 95)
+            small["body"] = (
+                "---\ntouches: [server/, stores/]\n---\n"
+                "# card\n- **Sizing:** full\n\n"
+                "## Execution Surface\n\n- **Risk surface:** `none`\n")
+            proc, data = run_file(orch, [lite, small])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertFalse(any("oversized" in w
+                                 for w in data.get("warnings", [])))
+            self.assertIn("S1", data["routine"])
+            self.assertIn("S2", data["routine"])
+
     def test_parked_assets_supersede_with_card(self):
         """A fresh draft supersedes a parked card — its parked mock
         assets ride along, and the superseded card's Mock line is
         retargeted instead of left citing parked/."""
         with tempfile.TemporaryDirectory() as tmp:
-            orch = self.make_orch(Path(tmp))
+            orch = make_orch(Path(tmp))
             pdir = orch / "alignment" / "parked"
             (pdir / "assets" / "S2").mkdir(parents=True)
             (pdir / "assets" / "S2" / "mock.html").write_text(

@@ -1,0 +1,43 @@
+[
+  {
+    "id": "ui-item-produces-wire-and-mock",
+    "input": "Finish drafting and file the card for S7.",
+    "state_prefix": "[the skill already ran preflight and grounded item S7 — a UI item adding an 'Export report' button to the dashboard toolbar in a Vite+React app; design tokens live in src/styles/tokens.css; the card body is drafted except Visual Preview] Continue the run.",
+    "rubric": [
+      "the transcript contains a wiretext:create_wireframe call whose objects include a browser component framing the dashboard route",
+      "a self-contained .html mock file was written (inline <style>, no http:// or CDN asset references) depicting the toolbar's new state",
+      "the cards.json card object carries both a wiretext.app URL in `wireframe` and a path to the produced html in `mock`",
+      "the filed card's Visual Preview section has neither Wireframe nor Mock left at a template placeholder, and neither is `n/a`"
+    ]
+  },
+  {
+    "id": "missing-doctrine-flags-ungrounded",
+    "input": "Continue the alignment drain.",
+    "state_prefix": "[preflight emitted warnings: 'doctrine store missing — no decision log found' and 'flow-ledger absent'; worklist holds S1, a backend retry-backoff job] Continue the run.",
+    "rubric": [
+      "a card for S1 is filed anyway — the run did not stop or ask the Operator to supply the missing stores",
+      "the filed card's Flags section carries an `ungrounded:` flag naming the missing store (doctrine and/or ledger)",
+      "the confidence score and its flags are presented as provisional rather than suppressed"
+    ]
+  },
+  {
+    "id": "oversized-item-gets-flag-and-split",
+    "input": "Draft the card for the 'notification-center' item.",
+    "state_prefix": "[grounded item NC-4: a `size: full` story that adds a notification center — schema table, realtime channel, UI bell+badge+droplist, read-state sync across components/ stores/ server/ drizzle/ — the approach text reads 'first the table, then the channel, then wire the UI'] Continue the run.",
+    "rubric": [
+      "the filed card's flags include `oversized`",
+      "the card body contains a `## Suggested Split` block naming at least two candidate keys with clean deps",
+      "the card is still filed (advisory, never a refusal) with a stated recommendation rather than a silent split"
+    ]
+  },
+  {
+    "id": "backend-item-mocks-consumer-surface",
+    "input": "File the card for BE-2.",
+    "state_prefix": "[grounded item BE-2: a backend lifecycle change — a new `retry_state` field on the jobs API, consumed by the Jobs page which renders it as a status badge with pending/failed states] Continue the run.",
+    "rubric": [
+      "the card's Mock line is NOT `n/a` — a state that surfaces in the UI has a UI surface",
+      "the produced mock depicts the consumer surface's new state (the badge/status element on the Jobs page), not backend internals",
+      "the wire (or `unavailable —` with a stated reason) depicts the same consumer surface, and the two artifacts do not contradict"
+    ]
+  }
+]

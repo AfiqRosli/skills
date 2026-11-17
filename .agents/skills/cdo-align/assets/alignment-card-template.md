@@ -64,20 +64,14 @@ grounded_against:
 
 ## Visual Preview
 
-<!-- The artifacts the Operator opens to check the design off WITH the
-     card — a confirmed card's wireframe URL is the pre-approved design;
-     the pipeline's wireframe gate reuses it instead of re-asking. The wire
-     frames the touched surface(s) in browser chrome and draws the to-be
-     in place — a sketch the Operator can't hold against the live page is
-     commentary, not design. The mock is the visual-fidelity companion:
-     same grounded read, real design tokens, self-contained HTML.
-     Standards live in the cdo-align skill — references/wireframe.md and
-     references/design-mock.md. The filer owns the Mock line — pass the
-     file (or directory) as `mock` in the filing JSON.
-     Backend items wire/mock the consumer surface's new state (the field
-     a component renders, the state a lifecycle implies, the affordance
-     a permission toggles). `n/a — no UI surface` only when NO surface
-     reflects the change — justify it in Flags, don't default to it. -->
+<!-- Both artifacts required for UI-affecting items from the same grounded
+     read — a confirmed card's wireframe URL is the pre-approved design;
+     the pipeline's wireframe gate reuses it instead of re-asking.
+     Standards: references/wireframe.md + references/design-mock.md in the
+     cdo-align skill. The filer owns the Mock line — pass the file (or
+     directory) as `mock` in the filing JSON. `n/a — no UI surface` only
+     when NO surface reflects the change (backend items depict the
+     consumer surface's new state) — justify it in Flags, don't default. -->
 
 - **Wireframe:** {https://wiretext.app/w/… | `n/a — no UI surface` | `unavailable — {reason}`}
 - **Mock:** {alignment/drafts/assets/{key}/mock.html | alignment/drafts/assets/{key}/mock/ | `n/a — no UI surface` | `unavailable — {reason}`}

@@ -16,7 +16,9 @@ Takes a cards JSON (array produced by the prompt layer, or an envelope
   4. flips the backlog marker `- [ ]`/`[?]` -> `- [A]` (alignment pending)
      so items aren't redrafted; `undraftable` entries flip `- [ ]` -> `- [?]`
   5. appends `gaps` to `alignment/gap-findings.md` and writes a run receipt
-     to `alignment/last-run.json`
+     to `alignment/last-run.json` — when cards filed, the receipt carries
+     `suggest: cdo-review`, an advisory next-leg pointer for the pipeline
+     driver (skills don't spawn successors)
 
 Idempotent by card key — re-running replaces the draft file and checklist line.
 
@@ -35,7 +37,16 @@ card body's Visual Preview section if present. `mock` is optional — a path to
 a produced HTML mock (file or directory), staged under
 `alignment/drafts/assets/{key}/` with the card's `**Mock:**` line set to the
 staged path; relative paths anchor to the --cards file's directory; a
-missing path degrades to `unavailable` with a warning, never fatal. Cards declaring a non-`none`
+missing path degrades to `unavailable` with a warning, never fatal.
+Consistency catches, both directions: a produced or attempted Wireframe
+(URL or `unavailable` — attempting presupposes a surface) beside Mock
+`n/a`/absent flags `mock-missing`; a produced mock beside Wireframe
+`n/a`/absent flags `wire-missing`. `unavailable — {reason}` on the other
+side is an honest claim and stays unflagged — it never excuses an `n/a`.
+Sizing catch: `**Sizing:** full` with >=3 distinct frontmatter `touches`
+entries trips the `oversized` signal deterministically — an unflagged card
+gets flagged `oversized` → Needs Attention (signal 2, sequential
+sub-features, stays interpretive in the prompt layer). Cards declaring a non-`none`
 `## Execution Surface` also route to Needs Attention — a declared risk
 surface is an Operator-eyeball item by definition (and ineligible for self-approve).
 Contract checks that can't be trusted to the prompt layer are enforced here:
@@ -63,7 +74,8 @@ from pathlib import Path
 import yaml
 
 from cardlayout import (  # noqa: E402 — vendored card-layout contract
-    MOCK_VALUE_RE, RISK_TOKENS, retarget_mock, superseded_assets)
+    MOCK_VALUE_RE, RISK_TOKENS, WIREFRAME_VALUE_RE, retarget_mock,
+    superseded_assets)
 from cardlayout import section as _section  # noqa: E402
 from cardlayout import set_mock_line as _set_mock_line  # noqa: E402
 
@@ -188,6 +200,64 @@ def _wireframe_url(card: dict):
             ) if w else None
     m = WIRETEXT_RE.search(_section(card.get("body"), "Visual Preview"))
     return (m.group(0) if m else None), warn
+
+
+def _mock_wire_consistency(card: dict, wire, mock_rel, warnings: list):
+    """Artifact-claim consistency, both directions. A produced or attempted
+    Wireframe (URL or `unavailable` — attempting presupposes a surface)
+    beside Mock `n/a`/absent flags `mock-missing`; the mirror — a produced
+    mock beside Wireframe `n/a`/absent — flags `wire-missing`. Both route
+    Needs Attention. `unavailable — {reason}` is an honest claim: it never
+    flags, and never excuses the other side's `n/a`. Reads the card body
+    after `_mock_plan` stamped the Mock line plus the actual staging
+    result, so both sides are truthful."""
+    key = card["key"]
+    sec = _section(card.get("body"), "Visual Preview")
+    m = WIREFRAME_VALUE_RE.search(sec)
+    wval = m.group(1).strip().strip("`") if m else ""
+    m = MOCK_VALUE_RE.search(sec)
+    mval = m.group(1).strip().strip("`") if m else ""
+    wire_claimed = bool(wire) or wval.startswith("unavailable")
+    wire_denied = not wval or wval.startswith("n/a")
+    mock_present = bool(mock_rel) or (
+        mval and not mval.startswith(("n/a", "unavailable")))
+    mock_denied = not mval or mval.startswith("n/a")
+    flags = card.setdefault("flags", [])
+    if wire_claimed and mock_denied:
+        warnings.append(
+            f"{key}: wireframe {'produced' if wire else 'attempted'} but "
+            f"Mock is `{'n/a' if mval else 'absent'}` — a wire presupposes "
+            "a UI surface; produce the mock or the n/a is wrong")
+        if isinstance(flags, list) and "mock-missing" not in flags:
+            flags.append("mock-missing")
+    if mock_present and wire_denied:
+        warnings.append(
+            f"{key}: mock produced but Wireframe is "
+            f"`{'n/a' if wval else 'absent'}` — a mock proves a UI "
+            "surface; produce the wire or the claim is wrong")
+        if isinstance(flags, list) and "wire-missing" not in flags:
+            flags.append("wire-missing")
+
+
+def _sizing_contract(card: dict, warnings: list):
+    """The `oversized` flag's countable half: `**Sizing:** full` plus >=3
+    distinct frontmatter `touches` entries trips the signal — an unflagged
+    card gets `oversized` appended (advisory; it still files, flagged →
+    Needs Attention). Signal 2 (sequential sub-features) stays in the
+    prompt layer — it's interpretive, not countable."""
+    fm = _frontmatter(card.get("body"))
+    touches = fm.get("touches")
+    m = re.search(r"- \*\*Sizing:\*\*\s*`?(\w+)`?", card.get("body") or "")
+    flags = card.setdefault("flags", [])
+    if (m and m.group(1).lower() == "full"
+            and isinstance(touches, list)
+            and len({str(t) for t in touches}) >= 3
+            and isinstance(flags, list) and "oversized" not in flags):
+        warnings.append(
+            f"{card['key']}: size `full` spanning "
+            f"{len({str(t) for t in touches})} touches entries trips the "
+            "`oversized` signal but the card didn't declare it — flagged")
+        flags.append("oversized")
 
 
 def _mock_health(src_path: Path, warnings: list, key: str):
@@ -507,6 +577,8 @@ def main():
         wire, warn = _wireframe_url(card)
         if warn:
             warnings.append(f"{key}: {warn}")
+        _mock_wire_consistency(card, wire, mock_rel, warnings)
+        _sizing_contract(card, warnings)
         declared, unknown = _risk_tokens(card.get("body"))
         if unknown:
             warnings.append(
@@ -594,6 +666,8 @@ def main():
         "undraftable": undrafted,
         "gaps": gaps,
     }
+    if filed:
+        result["suggest"] = "cdo-review"
     if warnings:
         result["warnings"] = warnings
     if unflipped:
@@ -612,6 +686,7 @@ def main():
             "routine": result["routine"],
             "undraftable": undrafted,
             "gaps": gaps,
+            **({"suggest": "cdo-review"} if filed else {}),
         }, indent=2), encoding="utf-8")
     out = json.dumps(result, indent=2)
     if args.output:

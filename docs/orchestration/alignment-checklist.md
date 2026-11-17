@@ -47,6 +47,9 @@ confidence — what the machine knows it's unsure about goes first.
 
 ## Deploy Sign-offs
 
+- [x] platform-01 — publish v0.3.0: merge preview → main, push origin main + tag v0.3.0 | lane ccef75d | marked 2026-11-17 → granted 2026-11-17 — Operator: push v0.3.0 — merge preview to main, push main + tag
+      confirm/granted = push it · reject/blocked = stays local
+
 ## Requisitions (env vars, credentials, accounts)
 
 - [ ] req-01 — `DEVIN_API_KEY` for dispatch workers (`devin acp` auth). Set the env var, write `{project-root}/.env`, or run `devin auth login`. Blocks: platform-01 drain spawn. | filed 2026-11-17

@@ -49,7 +49,7 @@ Run from your project root. Skills land in `.agents/skills/`; a `.agents/skills-
 Pinned version (recommended for release tags):
 
 ```bash
-bunx -p github:AfiqRosli/skills#v0.2.0 cdo
+bunx -p github:AfiqRosli/skills#v0.3.0 cdo
 ```
 
 ### Flags

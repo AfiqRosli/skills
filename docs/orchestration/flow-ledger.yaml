@@ -3,18 +3,18 @@ batch:
   started: null
   manifest: []
 pool:
-  confirmed:
-  - platform-01
+  confirmed: []
   quarantined: []
 stories:
   platform-01:
-    status: done
-    step: produced
+    status: shipped
+    pushed: 2026-11-17T11:10
+    step: published
     step_started: 2026-11-17T10:57
     session: marshal-inline
     attempts: 1
     findings: e73c38d cdo-align refresh + installed sync; 9665ec8 cdo install; ccef75d
-      v0.3.0 bump; tag v0.3.0 cut. Push to origin main + tag pending Deploy Sign-off.
+      v0.3.0 bump; tag v0.3.0 cut; origin/main 1320753 pushed with tag. Terminal.
 cost:
   budget: null
   burned: 0

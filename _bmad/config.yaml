@@ -10,3 +10,44 @@ srm:
   default_selected: false
   skills_repo_root: C:\Core\Businesses\Skills Repo
   git_pull: 'yes'
+cdo:
+  name: Autonomous Delivery Org
+  description: 24/7 autonomous delivery orchestration — Operator-gated alignment,
+    headless batch dispatch through cdo-code-e2e, ops-floor monitoring, and journaled
+    decision memory. Department modules (cdo-*) install separately.
+  version: 0.1.0
+  default_selected: false
+  orchestration_dir: '{project-root}/docs/orchestration'
+  sprint_status_path: '{project-root}/_bmad-output/implementation-artifacts/sprint-status.yaml'
+  story_location: '{project-root}/_bmad-output/implementation-artifacts/stories'
+  devlog_dir: '{project-root}/docs/orchestration/devlog'
+  package_manager: npm
+  health_commands: auto-detected from package.json
+  earned_autonomy: 'off'
+  alignment_buffer_min: '2'
+  stall_timeout_minutes: '45'
+  ship_target: preview
+  dispatch_mode: auto
+  dispatch_target: local
+  dispatch_permission_mode: bypass
+  backlog_map:
+    code: backlogs/code.md
+    curriculum: backlogs/curriculum.md
+    alignment-uncommitted-changes: backlogs/alignment-uncommitted-changes.md
+    code-e2e: backlogs/code-e2e.md
+    continuity: backlogs/continuity.md
+    delivery: backlogs/delivery.md
+    distillator: backlogs/distillator.md
+    docs: backlogs/docs.md
+    documentation: backlogs/documentation.md
+    git-pr-message: backlogs/git-pr-message.md
+    git-push: backlogs/git-push.md
+    git-quick-push: backlogs/git-quick-push.md
+    content: backlogs/content.md
+    platform: backlogs/platform.md
+    product: backlogs/product.md
+    quality: backlogs/quality.md
+    review-implement-refinement: backlogs/review-implement-refinement.md
+    security-audit-uncommitted-changes: backlogs/security-audit-uncommitted-changes.md
+    version-change-for-production: backlogs/version-change-for-production.md
+    version-upgrade: backlogs/version-upgrade.md

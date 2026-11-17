@@ -1,0 +1,19 @@
+batch:
+  id: null
+  started: null
+  manifest: []
+pool:
+  confirmed:
+  - platform-01
+  quarantined: []
+stories:
+  platform-01:
+    status: queued
+cost:
+  budget: null
+  burned: 0
+autonomy:
+  enabled: false
+  streak: 0
+  threshold: 10
+signals: []

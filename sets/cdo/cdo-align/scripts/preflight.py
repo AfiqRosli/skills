@@ -19,8 +19,13 @@ Backlog markers: `- [ ]` unaligned, `- [A]` draft filed, `- [?]` undraftable
 
 Usage:
   uv run preflight.py --orchestration-dir /path/docs/orchestration
-      [--backlog-dir DIR] [--story KEY | --limit N | --all] [--backlog NAME]
-      [--recent N] [-o out.json]
+      [--backlog-map '{"code": "backlogs/code.md"}' | --backlog-dir DIR]
+      [--story KEY | --limit N | --all] [--backlog NAME] [--recent N]
+      [-o out.json]
+
+`--backlog-map` is the cdo:backlog_map config value as JSON — orch-relative
+paths; the script resolves which files exist itself, so mapped backlogs may
+live outside {orch}/backlogs. `--backlog-dir` remains the manual override.
 
 Exit codes: 0=ok, 2=runtime error
 """
@@ -51,14 +56,42 @@ def _section(body: str, name: str) -> str:
     return rest[:nxt.start()] if nxt else rest
 
 
-def scan_backlogs(backlog_dir: Path, backlog_filter, story_key, limit, warnings):
-    """Return (worklist, skipped). `- [ ]` selects; `[A]`/`[?]` skip unless
-    --story targets the key (the re-draft / corrected-back path)."""
+def _backlog_files(raw: str, orch: Path):
+    """{stem: Path} from the --backlog-map JSON ({stem: orch-relative
+    path}) — the cdo: config value is the org's source of truth for where
+    backlog files live. Returns (files, error)."""
+    if not raw:
+        return {}, None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        return {}, f"--backlog-map isn't valid JSON: {e}"
+    if not isinstance(data, dict):
+        return {}, "--backlog-map must be a JSON object {stem: path}"
+    files = {}
+    for stem, rel in data.items():
+        p = Path(str(rel))
+        files[Path(str(stem)).stem] = p if p.is_absolute() else orch / p
+    return files, None
+
+
+def scan_backlogs(backlog_src, backlog_filter, story_key, limit, warnings):
+    """Return (worklist, skipped). backlog_src is a Path (dir to glob) or a
+    {stem: Path} map from --backlog-map — mapped entries may live anywhere
+    under orch. `- [ ]` selects; `[A]`/`[?]` skip unless --story targets
+    the key (the re-draft / corrected-back path)."""
     worklist, skipped = [], []
-    if not backlog_dir.is_dir():
-        warnings.append(f"backlog dir missing: {backlog_dir}")
-        return worklist, skipped
-    for f in sorted(backlog_dir.glob("*.md")):
+    if isinstance(backlog_src, dict):
+        files = [p for _, p in sorted(backlog_src.items()) if p.is_file()]
+        if not files:
+            warnings.append("no --backlog-map entries resolve to files")
+            return worklist, skipped
+    else:
+        if not backlog_src.is_dir():
+            warnings.append(f"backlog dir missing: {backlog_src}")
+            return worklist, skipped
+        files = sorted(backlog_src.glob("*.md"))
+    for f in files:
         if backlog_filter and f.stem != backlog_filter:
             continue
         for line in f.read_text(encoding="utf-8").splitlines():
@@ -178,6 +211,10 @@ def ledger_excerpt(orch: Path, recent: int, warnings) -> dict:
 def main():
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--orchestration-dir", required=True)
+    p.add_argument("--backlog-map",
+                   help="JSON of the cdo:backlog_map config ({stem: "
+                   "orch-relative path}) — the script resolves the backlog "
+                   "file list; supersedes --backlog-dir")
     p.add_argument("--backlog-dir",
                    help="default: {orchestration-dir}/backlogs")
     p.add_argument("--story", help="re-draft one key regardless of marker")
@@ -209,9 +246,13 @@ def main():
         warnings.append("git rev-parse HEAD failed — grounded_against.commit "
                         "will be empty; non-git environment")
     corpus, stale = corpus_index(orch, head)
+    bmap, bmap_err = _backlog_files(args.backlog_map, orch)
+    if bmap_err:
+        print(json.dumps({"errors": [bmap_err]}))
+        sys.exit(2)
     worklist, skipped = scan_backlogs(
-        Path(args.backlog_dir).resolve() if args.backlog_dir
-        else orch / "backlogs",
+        bmap or (Path(args.backlog_dir).resolve() if args.backlog_dir
+                 else orch / "backlogs"),
         args.backlog, args.story, None if args.all else args.limit, warnings)
 
     result = {

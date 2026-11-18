@@ -39,5 +39,16 @@
       "the produced mock depicts the consumer surface's new state (the badge/status element on the Jobs page), not backend internals",
       "the wire (or `unavailable —` with a stated reason) depicts the same consumer surface, and the two artifacts do not contradict"
     ]
+  },
+  {
+    "id": "phone-surface-gets-env-matched-frame",
+    "input": "Finish drafting and file the card for S9.",
+    "state_prefix": "[the skill already ran preflight and grounded item S9 — a UI item adding a referral share-preview card: the surface recipients see when a referral link is pasted into a chat app, experienced almost exclusively on a phone inside the chat thread (dominant environment: phone, chat host); Vite+React app, design tokens in src/styles/tokens.css; the card body is drafted except Visual Preview] Continue the run.",
+    "rubric": [
+      "the wiretext:create_wireframe call frames the surface in a portrait phone frame — a tall ~9:19 drawn bezel/box with a status-bar row — not a landscape `browser` component",
+      "the wire draws the host-app chrome around the card (chat header, message stream, compose row)",
+      "the produced .html mock renders the surface inside a ~9:19 portrait phone frame (notch/status bar, chat chrome) — not a desktop 16:9 viewport",
+      "the mock file's header comment names the environment frame (phone:{host-app})"
+    ]
   }
 ]

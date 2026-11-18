@@ -109,6 +109,27 @@ class TestPreflight(unittest.TestCase):
             self.assertEqual(d["declared_surface"], ["env-changed"])
             self.assertEqual(d["grounded_commit"], "aaaa1111")
 
+    def test_backlog_map_selects_mapped_file(self):
+        """--backlog-map carries the cdo:backlog_map config — a mapped
+        backlog outside {orch}/backlogs is scanned, the default dir
+        untouched by the map."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            (orch / "alt").mkdir()
+            (orch / "alt" / "code.md").write_text(
+                "- [ ] S9 — mapped\n", encoding="utf-8")
+            proc, data = run_preflight(
+                orch, ["--backlog-map", json.dumps({"code": "alt/code.md"})])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            self.assertEqual([w["key"] for w in data["worklist"]], ["S9"])
+
+    def test_backlog_map_malformed_is_named_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc, data = run_preflight(
+                make_orch(Path(tmp)), ["--backlog-map", "not json"])
+            self.assertEqual(proc.returncode, 2)
+            self.assertTrue(any("backlog-map" in e for e in data["errors"]))
+
     def test_missing_stores_warn_not_fail(self):
         with tempfile.TemporaryDirectory() as tmp:
             orch = Path(tmp) / "docs" / "orchestration"

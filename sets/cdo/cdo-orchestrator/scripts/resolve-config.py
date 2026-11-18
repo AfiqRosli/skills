@@ -15,7 +15,7 @@ Usage:
 
 Output JSON keys: user_name, communication_language, document_output_language,
 orchestration_dir, sprint_status_path, story_location, devlog_dir,
-package_manager, health_commands, backlog_map, earned_autonomy,
+product_docs, package_manager, health_commands, backlog_map, earned_autonomy,
 alignment_buffer_min, stall_timeout_minutes, batch_budget, ship_target,
 dispatch_target, dispatch_mode, dispatch_permission_mode,
 installed (bool — cdo section present).
@@ -43,6 +43,7 @@ DEFAULTS = {
     "sprint_status_path": "{project-root}/_bmad-output/implementation-artifacts/sprint-status.yaml",
     "story_location": "{project-root}/_bmad-output/implementation-artifacts/stories",
     "devlog_dir": "{project-root}/docs/orchestration/devlog",
+    "product_docs": "{project-root}/docs/product",
     "package_manager": None,
     "health_commands": "",
     "backlog_map": {},
@@ -80,7 +81,8 @@ def load_yaml(path: Path) -> dict:
         return {}
 
 
-PATH_KEYS = {"orchestration_dir", "sprint_status_path", "story_location", "devlog_dir"}
+PATH_KEYS = {"orchestration_dir", "sprint_status_path", "story_location",
+             "devlog_dir", "product_docs"}
 
 # Core keys are canonical in the TOML layers on BMAD v6.12+ (config.toml /
 # custom/config.toml / config.user.toml / custom/config.user.toml), resolved

@@ -58,7 +58,10 @@ The card the Operator reviews is this position. Their `confirm` means "your read
 Per item, draft a card from `assets/alignment-card-template.md` — the template owns the section list and the Execution Surface token contract: Marshal's Read is the position from Ground the Read (the part the Operator is actually reviewing), System Context its technical analog, Questions are judgment calls only paired with your recommended answer ("None — recommend confirm as drafted" is valid), and every remaining section the template names is required — a card that can't produce all sections isn't draftable (sizing follows `cdo-code-e2e` `lite|full` semantics).
 
 - **Contract frontmatter** — the YAML block is the machine-comparable surface dispatch and drift-watch diff: `deps`, `touches`, `emits`, `externals`, `declared_surface`, `grounded_against`. Keep it literal and honest; the filing script routes drift between `declared_surface` and the body to Needs Attention.
-- **Visual preview (UI-affecting items — including backend work whose state surfaces in the UI)** — two artifacts from the same grounded read, and the card is **not draft-complete until both resolve**: the **wire** per `references/wireframe.md` (build wire objects, call `wiretext:create_wireframe`, embed the URL in the card, pass it as `wireframe` in the filing JSON — a confirmed card's URL satisfies the pipeline's wireframe gate) and the **mock** per `references/design-mock.md` (one self-contained HTML file on the project's real design tokens, framed in the environment the surface lives in; pass the produced file or directory as `mock` in the filing JSON — the script stages it at `alignment/drafts/assets/{key}/` and owns the card's Mock line). `n/a — no UI surface` on both for non-UI items; `unavailable — {reason}` when production genuinely fails. A missing wiretext does not excuse a missing mock — the asymmetry check is at File.
+- **Visual preview (UI-affecting items — including backend work whose state surfaces in the UI)** — two artifacts from the same grounded read; the card is **not draft-complete until both resolve**:
+  - **Wire** — per `references/wireframe.md`: build wire objects, call `wiretext:create_wireframe`, embed the URL in the card, pass it as `wireframe` in the filing JSON (a confirmed card's URL satisfies the pipeline's wireframe gate).
+  - **Mock** — per `references/design-mock.md`: produce one self-contained HTML file on the project's real design tokens, framed in the environment the surface lives in; pass the file or directory as `mock` in the filing JSON (the filer stages it and owns the Mock line's rendered value).
+  - `n/a — no UI surface` on both for non-UI items; `unavailable — {reason}` when production genuinely fails. A claimed wire beside a denied mock fails filing — produce the mock or correct the claim.
 
 ## Co-sign (when cdo-product is installed)
 
@@ -66,7 +69,7 @@ Every card needs a second signature **before filing** — when `{project-root}/.
 
 ## File
 
-File **incrementally** — per card or in small chunks as they're signed, not one end-of-run batch: a run that dies mid-drain keeps everything already filed. Write `cards.json` under a temp dir and file it — the payload schema (bare array vs `{"cards", "undraftable", "gaps"}` envelope), mock staging, and every contract check the filer enforces live in `scripts/file-cards.py`'s module docstring; read it before assembling the payload.
+File **incrementally** — per card or in small chunks as they're signed, not one end-of-run batch: a run that dies mid-drain keeps everything already filed. A card enters the payload only when both Visual Preview artifacts resolve to a value or an honest claim — wire-only fails filing. Write `cards.json` under a temp dir and file it — the payload schema (bare array vs `{"cards", "undraftable", "gaps"}` envelope), mock staging, and every contract check the filer enforces live in `scripts/file-cards.py`'s module docstring; read it before assembling the payload.
 
 ```bash
 uv run scripts/file-cards.py --orchestration-dir "{orchestration_dir-resolved}" --cards {temp}/cards.json --backlog-map '{backlog_map as JSON}'

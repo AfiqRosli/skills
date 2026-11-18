@@ -68,7 +68,8 @@ grounded_against:
      read — a confirmed card's wireframe URL is the pre-approved design;
      the pipeline's wireframe gate reuses it instead of re-asking.
      Standards: references/wireframe.md + references/design-mock.md in the
-     cdo-align skill. The filer owns the Mock line — pass the file (or
+     cdo-align skill. The filer owns the Mock line's rendered value —
+     you produce the artifact before filing and pass the file (or
      directory) as `mock` in the filing JSON. `n/a — no UI surface` only
      when NO surface reflects the change (backend items depict the
      consumer surface's new state) — justify it in Flags, don't default. -->

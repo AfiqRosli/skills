@@ -59,11 +59,14 @@ a produced HTML mock (file or directory), staged under
 `alignment/drafts/assets/{key}/` with the card's `**Mock:**` line set to the
 staged path; relative paths anchor to the --cards file's directory; a
 missing path degrades to `unavailable` with a warning, never fatal.
-Consistency catches, both directions: a produced or attempted Wireframe
-(URL or `unavailable` — attempting presupposes a surface) beside Mock
-`n/a`/absent flags `mock-missing`; a produced mock beside Wireframe
-`n/a`/absent flags `wire-missing`. `unavailable — {reason}` on the other
-side is an honest claim and stays unflagged — it never excuses an `n/a`.
+Draft-completeness gate: a produced or attempted Wireframe (URL or
+`unavailable` — attempting presupposes a surface) beside Mock
+`n/a`/absent is a named validation error — the card is not
+draft-complete and the batch fails before anything files. The mirror is
+advisory: a produced mock beside Wireframe `n/a`/absent flags
+`wire-missing` → Needs Attention (the wire's gate is downstream).
+`unavailable — {reason}` is an honest claim on either side — never an
+error, and never an excuse for the other side's `n/a`.
 A file mock's health floor warns on: non-HTML/tiny bodies, external asset
 refs, placeholder styling (→ `ungrounded:design-tokens`), and a header
 comment declaring no environment frame (`browser:{route}` |
@@ -264,39 +267,54 @@ def _wireframe_url(card: dict):
     return (m.group(0) if m else None), warn
 
 
-def _mock_wire_consistency(card: dict, wire, mock_rel, warnings: list):
-    """Artifact-claim consistency, both directions. A produced or attempted
+def _artifact_gate(card: dict, wire, mock_rel):
+    """Draft-completeness gate — the filer-side half of 'not
+    draft-complete until both resolve'. A produced or attempted
     Wireframe (URL or `unavailable` — attempting presupposes a surface)
-    beside Mock `n/a`/absent flags `mock-missing`; the mirror — a produced
-    mock beside Wireframe `n/a`/absent — flags `wire-missing`. Both route
-    Needs Attention. `unavailable — {reason}` is an honest claim: it never
-    flags, and never excuses the other side's `n/a`. Reads the card body
-    after `_mock_plan` stamped the Mock line plus the actual staging
-    result, so both sides are truthful."""
-    key = card["key"]
+    beside a Mock that is `n/a` or absent is a named validation error:
+    the batch fails before anything files. Honest exits stay open —
+    `n/a` beside no wire claim, `unavailable — {reason}` on the mock.
+    Reads the body after `_mock_plan` stamped the Mock line, so both
+    sides are truthful. The mirror (mock produced, wire denied) is
+    advisory — `_mock_wire_consistency` flags it; the wire's gate is
+    downstream."""
     sec = _section(card.get("body"), "Visual Preview")
     m = WIREFRAME_VALUE_RE.search(sec)
     wval = m.group(1).strip().strip("`") if m else ""
     m = MOCK_VALUE_RE.search(sec)
     mval = m.group(1).strip().strip("`") if m else ""
     wire_claimed = bool(wire) or wval.startswith("unavailable")
+    mock_denied = not mval or mval.startswith("n/a")
+    if wire_claimed and mock_denied:
+        return (f"{card['key']}: wireframe "
+                f"{'produced' if wire else 'attempted'} but Mock is "
+                f"`{'n/a' if mval else 'absent'}` — a wire presupposes "
+                "a UI surface; produce the mock or the n/a is wrong")
+    return None
+
+
+def _mock_wire_consistency(card: dict, wire, mock_rel, warnings: list):
+    """Mirror-direction consistency: a produced mock beside Wireframe
+    `n/a`/absent flags `wire-missing` → Needs Attention — advisory, the
+    wire's gate is downstream. The opposite direction is the
+    `_artifact_gate` contract break and never reaches here. Reads the
+    card body after `_mock_plan` stamped the Mock line plus the actual
+    staging result, so both sides are truthful."""
+    key = card["key"]
+    sec = _section(card.get("body"), "Visual Preview")
+    m = WIREFRAME_VALUE_RE.search(sec)
+    wval = m.group(1).strip().strip("`") if m else ""
+    m = MOCK_VALUE_RE.search(sec)
+    mval = m.group(1).strip().strip("`") if m else ""
     wire_denied = not wval or wval.startswith("n/a")
     mock_present = bool(mock_rel) or (
         mval and not mval.startswith(("n/a", "unavailable")))
-    mock_denied = not mval or mval.startswith("n/a")
-    flags = card.setdefault("flags", [])
-    if wire_claimed and mock_denied:
-        warnings.append(
-            f"{key}: wireframe {'produced' if wire else 'attempted'} but "
-            f"Mock is `{'n/a' if mval else 'absent'}` — a wire presupposes "
-            "a UI surface; produce the mock or the n/a is wrong")
-        if isinstance(flags, list) and "mock-missing" not in flags:
-            flags.append("mock-missing")
     if mock_present and wire_denied:
         warnings.append(
             f"{key}: mock produced but Wireframe is "
             f"`{'n/a' if wval else 'absent'}` — a mock proves a UI "
             "surface; produce the wire or the claim is wrong")
+        flags = card.setdefault("flags", [])
         if isinstance(flags, list) and "wire-missing" not in flags:
             flags.append("wire-missing")
 
@@ -619,6 +637,26 @@ def main():
                        / "SKILL.md").is_file()
     head = head_sha(project_root)  # "" outside a git repo — compare skips
 
+    warnings = []
+    # draft-completeness gate: resolve every card's wire + mock first —
+    # a claimed wire beside a denied mock fails the batch before any
+    # write, so a wire-only card never half-files a drain
+    cards_dir = Path(args.cards).resolve().parent
+    plans = {}
+    gate_errors = []
+    for card in sorted(cards, key=lambda c: int(c.get("confidence", 0))):
+        mock_src, mock_rel = _mock_plan(card, warnings, cards_dir, orch)
+        wire, warn = _wireframe_url(card)
+        if warn:
+            warnings.append(f"{card['key']}: {warn}")
+        err = _artifact_gate(card, wire, mock_rel)
+        if err:
+            gate_errors.append(err)
+        plans[card["key"]] = (mock_src, mock_rel, wire)
+    if gate_errors:
+        print(json.dumps({"errors": gate_errors}, indent=2))
+        sys.exit(1)
+
     drafts_dir = orch / "alignment" / "drafts"
     if not args.dry_run:
         drafts_dir.mkdir(parents=True, exist_ok=True)
@@ -626,15 +664,12 @@ def main():
 
     filed = []
     unflipped = []
-    warnings = []
     superseded_dir = orch / "alignment" / "superseded"
     for card in sorted(cards, key=lambda c: int(c.get("confidence", 0))):
         key = card["key"]
-        # resolve + set the Mock line before the body is compared/written —
         # the staged path must be truthful in the filed draft; the file
         # copy waits until after any supersede snapshot moves old assets
-        cards_dir = Path(args.cards).resolve().parent
-        mock_src, mock_rel = _mock_plan(card, warnings, cards_dir, orch)
+        mock_src, mock_rel, wire = plans[key]
         draft_path = drafts_dir / f"{key}.md"
         if draft_path.is_file() and \
                 draft_path.read_text(encoding="utf-8") != card["body"]:
@@ -675,9 +710,6 @@ def main():
             if mock_src is not None:
                 _copy_mock(mock_src, key, drafts_dir)
 
-        wire, warn = _wireframe_url(card)
-        if warn:
-            warnings.append(f"{key}: {warn}")
         _mock_wire_consistency(card, wire, mock_rel, warnings)
         _sizing_contract(card, warnings)
         declared, unknown = _risk_tokens(card.get("body"))

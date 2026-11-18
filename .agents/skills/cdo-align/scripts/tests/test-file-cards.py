@@ -153,8 +153,11 @@ class TestFileCards(unittest.TestCase):
     def test_wireframe_url_on_checklist_line(self):
         with tempfile.TemporaryDirectory() as tmp:
             orch = make_orch(Path(tmp))
+            mock_src = Path(tmp) / "mock.html"
+            mock_src.write_text(MOCK_HTML, encoding="utf-8")
             c = card("S1", 90)
             c["wireframe"] = "https://wiretext.app/w/abc12345"
+            c["mock"] = str(mock_src)  # a claimed wire needs its mock
             run_file(orch, [c])
             text = (orch / "alignment-checklist.md").read_text(encoding="utf-8")
             self.assertIn("| wire: https://wiretext.app/w/abc12345", text)
@@ -162,10 +165,13 @@ class TestFileCards(unittest.TestCase):
     def test_wireframe_recovered_from_card_body(self):
         with tempfile.TemporaryDirectory() as tmp:
             orch = make_orch(Path(tmp))
+            mock_src = Path(tmp) / "mock.html"
+            mock_src.write_text(MOCK_HTML, encoding="utf-8")
             c = card("S1", 90, sections={
                 "Visual Preview":
                     "- **Wireframe:** https://wiretext.app/w/xyz987\n"
                     "- **Mock:** n/a — no UI surface\n"})
+            c["mock"] = str(mock_src)  # a claimed wire needs its mock
             run_file(orch, [c])
             text = (orch / "alignment-checklist.md").read_text(encoding="utf-8")
             self.assertIn("| wire: https://wiretext.app/w/xyz987", text)
@@ -849,35 +855,52 @@ class TestMockStagingEdges(unittest.TestCase):
             self.assertIn(
                 "- **Mock:** alignment/drafts/assets/S1/mock.html", body)
 
-    def test_wire_with_na_mock_flags_missing(self):
-        """Wire produced + Mock `n/a` is a contradiction — a wire proves
-        a UI surface; flag mock-missing, route Needs Attention."""
+    def test_wire_with_na_mock_fails_filing(self):
+        """Wire produced + Mock `n/a` is a contract break — a wire proves
+        a UI surface; named error, nothing files."""
         with tempfile.TemporaryDirectory() as tmp:
             orch = make_orch(Path(tmp))
             c = self._vp_card("S1", 95, mock_line="n/a — no UI surface")
             proc, data = run_file(orch, [c])
-            self.assertEqual(proc.returncode, 0, proc.stderr)
-            self.assertTrue(any("n/a" in w and "wire" in w
-                                for w in data["warnings"]))
-            self.assertIn("S1", data["needs_attention"])
-            text = (orch / "alignment-checklist.md").read_text(
-                encoding="utf-8")
-            self.assertIn("mock-missing", text)
+            self.assertEqual(proc.returncode, 1)
+            self.assertTrue(any("n/a" in e and "S1" in e
+                                for e in data["errors"]))
+            self.assertFalse(
+                (orch / "alignment" / "drafts" / "S1.md").exists())
+            self.assertIn("- [ ] S1",
+                          (orch / "backlogs" / "code.md")
+                          .read_text(encoding="utf-8"))
 
-    def test_wire_with_no_mock_line_flags_missing(self):
+    def test_wire_with_no_mock_line_fails_filing(self):
         """Wire produced + no Mock line at all — the drafter filed before
-        finishing Visual Preview; flag mock-missing."""
+        finishing Visual Preview; named error, nothing files."""
         with tempfile.TemporaryDirectory() as tmp:
             orch = make_orch(Path(tmp))
             c = self._vp_card("S1", 95)
             proc, data = run_file(orch, [c])
-            self.assertEqual(proc.returncode, 0, proc.stderr)
-            self.assertTrue(any("`absent`" in w
-                                for w in data["warnings"]))
-            self.assertIn("S1", data["needs_attention"])
+            self.assertEqual(proc.returncode, 1)
+            self.assertTrue(any("`absent`" in e for e in data["errors"]))
+            self.assertFalse(
+                (orch / "alignment" / "drafts" / "S1.md").exists())
+
+    def test_gate_fails_batch_before_any_writes(self):
+        """A wire-only card in a multi-card batch aborts the whole
+        payload — the clean card files nothing either (no half-filed
+        run)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            orch = make_orch(Path(tmp))
+            good = card("S2", 95)  # n/a both — honest non-UI
+            bad = self._vp_card("S1", 95)
+            proc, data = run_file(orch, [good, bad])
+            self.assertEqual(proc.returncode, 1)
+            self.assertFalse(
+                (orch / "alignment" / "drafts" / "S2.md").exists())
             text = (orch / "alignment-checklist.md").read_text(
                 encoding="utf-8")
-            self.assertIn("mock-missing", text)
+            self.assertNotIn("S2 — Story S2", text)
+            self.assertIn("- [ ] S2",
+                          (orch / "backlogs" / "code.md")
+                          .read_text(encoding="utf-8"))
 
     def test_wire_with_unavailable_mock_no_flag(self):
         """`unavailable — {reason}` beside a wire is an honest claim —
@@ -950,9 +973,9 @@ class TestMockStagingEdges(unittest.TestCase):
                 encoding="utf-8")
             self.assertIn("wire-missing", text)
 
-    def test_unavailable_wire_na_mock_flags_missing(self):
+    def test_unavailable_wire_na_mock_fails_filing(self):
         """An `unavailable` wire was *attempted* — attempting presupposes
-        a surface, so Mock `n/a` beside it still flags mock-missing."""
+        a surface, so Mock `n/a` beside it is still a contract break."""
         with tempfile.TemporaryDirectory() as tmp:
             orch = make_orch(Path(tmp))
             c = card("S1", 95, sections={
@@ -960,11 +983,11 @@ class TestMockStagingEdges(unittest.TestCase):
                     "- **Wireframe:** unavailable — wiretext MCP absent\n"
                     "- **Mock:** n/a — no UI surface\n"})
             proc, data = run_file(orch, [c])
-            self.assertEqual(proc.returncode, 0, proc.stderr)
-            self.assertIn("S1", data["needs_attention"])
-            text = (orch / "alignment-checklist.md").read_text(
-                encoding="utf-8")
-            self.assertIn("mock-missing", text)
+            self.assertEqual(proc.returncode, 1)
+            self.assertTrue(any("n/a" in e and "S1" in e
+                                for e in data["errors"]))
+            self.assertFalse(
+                (orch / "alignment" / "drafts" / "S1.md").exists())
 
     def test_unavailable_wire_real_mock_no_flag(self):
         """Wire failed honestly, mock produced — the consistent state:

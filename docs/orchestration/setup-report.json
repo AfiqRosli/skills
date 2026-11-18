@@ -1,0 +1,175 @@
+{
+  "script": "cdo-propose-config",
+  "mode": "upgrade",
+  "proposed": [
+    {
+      "key": "orchestration_dir",
+      "value": "{project-root}/docs/orchestration",
+      "source": "stored"
+    },
+    {
+      "key": "sprint_status_path",
+      "value": "{project-root}/_bmad-output/implementation-artifacts/sprint-status.yaml",
+      "source": "stored"
+    },
+    {
+      "key": "story_location",
+      "value": "{project-root}/_bmad-output/implementation-artifacts/stories",
+      "source": "stored"
+    },
+    {
+      "key": "devlog_dir",
+      "value": "{project-root}/docs/orchestration/devlog",
+      "source": "stored"
+    },
+    {
+      "key": "product_docs",
+      "value": "{project-root}/docs/product",
+      "source": "stored"
+    },
+    {
+      "key": "package_manager",
+      "value": "npm",
+      "source": "stored"
+    },
+    {
+      "key": "health_commands",
+      "value": "auto-detected from package.json",
+      "source": "stored"
+    },
+    {
+      "key": "earned_autonomy",
+      "value": "off",
+      "source": "stored"
+    },
+    {
+      "key": "alignment_buffer_min",
+      "value": "2",
+      "source": "stored"
+    },
+    {
+      "key": "stall_timeout_minutes",
+      "value": "45",
+      "source": "stored"
+    },
+    {
+      "key": "batch_budget",
+      "value": "",
+      "source": "default"
+    },
+    {
+      "key": "ship_target",
+      "value": "preview",
+      "source": "stored"
+    },
+    {
+      "key": "dispatch_mode",
+      "value": "auto",
+      "source": "stored"
+    },
+    {
+      "key": "dispatch_target",
+      "value": "local",
+      "source": "stored"
+    },
+    {
+      "key": "dispatch_permission_mode",
+      "value": "bypass",
+      "source": "stored"
+    },
+    {
+      "key": "backlog_map",
+      "value": {
+        "code": "backlogs/code.md",
+        "curriculum": "backlogs/curriculum.md",
+        "alignment-uncommitted-changes": "backlogs/alignment-uncommitted-changes.md",
+        "code-e2e": "backlogs/code-e2e.md",
+        "continuity": "backlogs/continuity.md",
+        "delivery": "backlogs/delivery.md",
+        "distillator": "backlogs/distillator.md",
+        "docs": "backlogs/docs.md",
+        "documentation": "backlogs/documentation.md",
+        "git-pr-message": "backlogs/git-pr-message.md",
+        "git-push": "backlogs/git-push.md",
+        "git-quick-push": "backlogs/git-quick-push.md",
+        "content": "backlogs/content.md",
+        "platform": "backlogs/platform.md",
+        "product": "backlogs/product.md",
+        "quality": "backlogs/quality.md",
+        "review-implement-refinement": "backlogs/review-implement-refinement.md",
+        "security-audit-uncommitted-changes": "backlogs/security-audit-uncommitted-changes.md",
+        "version-change-for-production": "backlogs/version-change-for-production.md",
+        "version-upgrade": "backlogs/version-upgrade.md"
+      },
+      "source": "stored (extra)"
+    },
+    {
+      "key": "backlog_map",
+      "value": {
+        "code": "backlogs/code.md",
+        "curriculum": "backlogs/curriculum.md",
+        "alignment-uncommitted-changes": "backlogs/alignment-uncommitted-changes.md",
+        "code-e2e": "backlogs/code-e2e.md",
+        "continuity": "backlogs/continuity.md",
+        "delivery": "backlogs/delivery.md",
+        "distillator": "backlogs/distillator.md",
+        "docs": "backlogs/docs.md",
+        "documentation": "backlogs/documentation.md",
+        "git-pr-message": "backlogs/git-pr-message.md",
+        "git-push": "backlogs/git-push.md",
+        "git-quick-push": "backlogs/git-quick-push.md",
+        "content": "backlogs/content.md",
+        "platform": "backlogs/platform.md",
+        "product": "backlogs/product.md",
+        "quality": "backlogs/quality.md",
+        "review-implement-refinement": "backlogs/review-implement-refinement.md",
+        "security-audit-uncommitted-changes": "backlogs/security-audit-uncommitted-changes.md",
+        "version-change-for-production": "backlogs/version-change-for-production.md",
+        "version-upgrade": "backlogs/version-upgrade.md"
+      },
+      "source": "derived"
+    }
+  ],
+  "answers": {
+    "module": {
+      "orchestration_dir": "{project-root}/docs/orchestration",
+      "sprint_status_path": "{project-root}/_bmad-output/implementation-artifacts/sprint-status.yaml",
+      "story_location": "{project-root}/_bmad-output/implementation-artifacts/stories",
+      "devlog_dir": "{project-root}/docs/orchestration/devlog",
+      "product_docs": "{project-root}/docs/product",
+      "package_manager": "npm",
+      "health_commands": "auto-detected from package.json",
+      "earned_autonomy": "off",
+      "alignment_buffer_min": "2",
+      "stall_timeout_minutes": "45",
+      "ship_target": "preview",
+      "dispatch_mode": "auto",
+      "dispatch_target": "local",
+      "dispatch_permission_mode": "bypass",
+      "backlog_map": {
+        "code": "backlogs/code.md",
+        "curriculum": "backlogs/curriculum.md",
+        "alignment-uncommitted-changes": "backlogs/alignment-uncommitted-changes.md",
+        "code-e2e": "backlogs/code-e2e.md",
+        "continuity": "backlogs/continuity.md",
+        "delivery": "backlogs/delivery.md",
+        "distillator": "backlogs/distillator.md",
+        "docs": "backlogs/docs.md",
+        "documentation": "backlogs/documentation.md",
+        "git-pr-message": "backlogs/git-pr-message.md",
+        "git-push": "backlogs/git-push.md",
+        "git-quick-push": "backlogs/git-quick-push.md",
+        "content": "backlogs/content.md",
+        "platform": "backlogs/platform.md",
+        "product": "backlogs/product.md",
+        "quality": "backlogs/quality.md",
+        "review-implement-refinement": "backlogs/review-implement-refinement.md",
+        "security-audit-uncommitted-changes": "backlogs/security-audit-uncommitted-changes.md",
+        "version-change-for-production": "backlogs/version-change-for-production.md",
+        "version-upgrade": "backlogs/version-upgrade.md"
+      }
+    }
+  },
+  "core_auto_omitted": true,
+  "note": "core block omitted \u2014 existing core keys detected (communication_language, document_output_language, output_folder, project_name, user_name); pass --core-set to override a value explicitly"
+}

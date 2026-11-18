@@ -1,7 +1,7 @@
 code: cdo
 name: Autonomous Delivery Org
 description: "24/7 autonomous delivery orchestration — Operator-gated alignment, headless batch dispatch through cdo-code-e2e, ops-floor monitoring, and journaled decision memory. Department modules (cdo-*) install separately."
-module_version: 0.1.0
+module_version: 0.1.1
 default_selected: false
 module_greeting: >
   Autonomous Delivery Org installed — orchestration tree scaffolded under
@@ -26,6 +26,10 @@ devlog_dir:
   prompt: "Dev log root directory?"
   default: "{project-root}/docs/orchestration/devlog"
   result: "{project-root}/{value}"
+
+product_docs:
+  prompt: "Where do product source docs (PRFAQ, specs, requirements) live — the inputs intent.md distills?"
+  default: "{project-root}/docs/product"
 
 package_manager:
   prompt: "Package manager (bun/npm/pnpm/yarn)?"

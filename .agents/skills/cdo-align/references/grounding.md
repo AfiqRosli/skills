@@ -7,7 +7,7 @@ What "grounded" looks like per source. Outcome over ritual: the goal is that no 
 - **Integration points** — where the work actually lands: routes, services, stores, schema tables, hooks, emit points. Cite `file:line`; `no anchor found` is a flag, not a sentence on the card.
 - **Existing machinery** — what already does part of the job (emitters, senders, schedulers, util modules). Reuse beats rebuild; duplication gets named in Marshal's Read, not smuggled into scope.
 - **Spec deltas** — hooks, events, tables, or routes the spec assumes that don't exist. Each is a scope challenge or a flag — never silently absorbed into "the spec says so".
-- **UI surfaces** — for UI-touching items, open the actual page/component *and its design tokens* (global CSS, font/spacing scales, component names): the Visual Preview wire draws the to-be inside browser chrome and the mock renders it on the real design language (per the wireframe and design-mock standards). For backend items, trace **which surface consumes the changed state** — the component rendering the affected data, the state a lifecycle implies (pending/empty/error) — and wire/mock that surface's new state. `n/a — no UI surface` is a claim you justify, not a default: if a surface reflects the change, it gets artifacts. A wire or mock sketched from spec prose is commentary, not design.
+- **UI surfaces** — for UI-affecting items, open the actual page/component, its design tokens (global CSS, font/spacing scales, component names), *and the dominant environment the surface is experienced in* (browser route vs phone host-app — the frame matches it): the Visual Preview wire and mock frame the to-be inside that environment's chrome. For backend items, trace **which surface consumes the changed state** — the component rendering the affected data, the state a lifecycle implies (pending/empty/error) — and wire/mock that surface's new state. `n/a — no UI surface` is a claim you justify, not a default: if a surface reflects the change, it gets artifacts. A wire or mock sketched from spec prose is commentary, not design.
 - **Tree state** — `git rev-parse HEAD` at draft time feeds `grounded_against.commit`. A card verified against a three-week-old tree is detectable at dispatch; an unanchored card isn't.
 
 ## Externals (third-party platforms, APIs, libraries)
@@ -32,7 +32,22 @@ Verified → fact on the card (System Context's `owns vs platform` carries the s
 - **`learning/knowledge/*.yaml`** — extracted lessons from shipped stories.
 - **Doctrine Decision Log corrections** — `confirm-edited` notes record *what* the Operator changed on past cards; recurring corrections are your score's prior.
 
-## The sixth read — strategic axes rubric
+## The sixth read — interrogate, then position
+
+The catalog grounds the item; this read is where the card's *position* comes from. Interrogate before compiling:
+
+- What business intent does this serve — name the outcome, or flag that none is legible.
+- Who's the user and what would they notice?
+- Do the epic's acceptance criteria measure the outcome or just the output?
+- Is the decomposition hiding scope, smuggling a decision, or sequencing things backwards?
+- Is there a materially cheaper route to the same intent the spec doesn't consider?
+
+Then compile holistically, not item-local — an item that duplicates or contradicts a sibling gets that named on the card — and discharge two closing duties:
+
+- **Self-adversarial** — the strongest argument *against* your read goes on the card; if you can't write one, the read isn't finished.
+- **Gap-surfacing** — adjacent work the backlog doesn't carry (missing stages, unnamed edges) lands in `gaps` on the filing payload, flagged on the card; you're the one pair of eyes that sees the whole backlog fresh.
+
+### Strategic axes rubric
 
 The card's Marshal's Read answers six named questions — argue each, don't hand-wave:
 

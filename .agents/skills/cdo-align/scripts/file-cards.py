@@ -24,14 +24,35 @@ Idempotent by card key — re-running replaces the draft file and checklist line
 
 Usage:
   uv run file-cards.py --orchestration-dir /path/docs/orchestration
-      --cards cards.json [--backlog-dir /path/docs/orchestration/backlogs]
-      [--attention-threshold 80] [--dry-run] [-o result.json]
+      --cards cards.json [--backlog-map '{"code": "backlogs/code.md"}']
+      [--backlog-dir DIR] [--attention-threshold 80] [--dry-run] [-o out.json]
 
-Cards JSON: [{"key","title","backlog","confidence","flags":[...],
-              "asks": 0, "body": "...", "wireframe": "https://wiretext.app/w/…",
-              "mock": "/path/to/mock.html"}]
+`--backlog-map` is the cdo:backlog_map config value as JSON — orch-relative
+paths; the script resolves where each backlog file lives itself (entries may
+sit outside {orch}/backlogs; unmapped stems fall back to --backlog-dir).
+`--backlog-dir` remains the manual override when no map is passed.
+
+Cards JSON: a bare array, or an envelope
+{"cards": [...], "undraftable": [{key, reason, backlog}], "gaps": [...]} —
+undraftable entries flip `- [ ]` -> `- [?]`; gaps append to
+alignment/gap-findings.md.
+Card objects: {"key","title","backlog","confidence","flags":[...],
+               "asks": 0, "body": "...",
+               "wireframe": "https://wiretext.app/w/…",
+               "mock": "/path/to/mock.html"}
 `asks` is derived from the card's Questions section; a supplied count that
 disagrees warns and the derived count wins — a card's asks>0 → Needs Attention.
+Contract checks enforced at filing (not trusted to the prompt layer):
+  - every template-required `##` section must be present and non-empty —
+    a section-less card is a named validation error
+  - frontmatter `grounded_against.commit` must be non-empty (an empty
+    commit goes dark to staleness detection); commit != HEAD warns
+  - frontmatter `declared_surface` must equal the Execution Surface tokens
+  - the `P&D co-sign:` stamp must be the contracted line
+    `- **P&D co-sign:** {verdict}` — a substring mention or the template's
+    unsubstituted `{...}` placeholder is not a signature
+  - Questions bullets count unless they match the `None —` sentinel shape
+    (a real question phrased "None of the …" still counts)
 `wireframe` is optional — when absent, a wiretext URL is recovered from the
 card body's Visual Preview section if present. `mock` is optional — a path to
 a produced HTML mock (file or directory), staged under
@@ -43,15 +64,17 @@ Consistency catches, both directions: a produced or attempted Wireframe
 `n/a`/absent flags `mock-missing`; a produced mock beside Wireframe
 `n/a`/absent flags `wire-missing`. `unavailable — {reason}` on the other
 side is an honest claim and stays unflagged — it never excuses an `n/a`.
+A file mock's health floor warns on: non-HTML/tiny bodies, external asset
+refs, placeholder styling (→ `ungrounded:design-tokens`), and a header
+comment declaring no environment frame (`browser:{route}` |
+`phone:{host-app|bare}` — the env choice stays prompt-side judgment; the
+declaration's presence is the fixed-shape check).
 Sizing catch: `**Sizing:** full` with >=3 distinct frontmatter `touches`
 entries trips the `oversized` signal deterministically — an unflagged card
 gets flagged `oversized` → Needs Attention (signal 2, sequential
 sub-features, stays interpretive in the prompt layer). Cards declaring a non-`none`
 `## Execution Surface` also route to Needs Attention — a declared risk
 surface is an Operator-eyeball item by definition (and ineligible for self-approve).
-Contract checks that can't be trusted to the prompt layer are enforced here:
-frontmatter `declared_surface` must equal the Execution Surface tokens, and a
-missing Execution Surface section warns instead of passing as honest `none`.
 When `cdo-product` is installed (`.agents/skills/cdo-product/SKILL.md`), a card
 with no `P&D co-sign:` line skipped the second signature — not a refusal: it
 gets flagged `unsigned-cosign` and routed to Needs Attention so the bypass
@@ -60,6 +83,12 @@ gets flagged `unsigned-cosign` and routed to Needs Attention so the bypass
 stamped — the co-sign ran, the Operator adjudicates the dispute.
 Re-filing a key snapshots the replaced draft to `alignment/superseded/`
 before overwrite, so later reads can diff what changed.
+Receipt: stdout JSON carries status, dry_run, filed[], needs_attention[],
+routine[], undraftable[], gaps, warnings, filed_count/attention_count/
+routine_count, and `suggest: cdo-review` when anything filed; the same
+receipt persists to `alignment/last-run.json` — that pair is the headless
+caller contract (blocked stops print `{"status": "blocked", ...}` from the
+prompt layer instead).
 Exit codes: 0=ok, 1=validation error, 2=runtime error
 """
 
@@ -74,8 +103,8 @@ from pathlib import Path
 import yaml
 
 from cardlayout import (  # noqa: E402 — vendored card-layout contract
-    MOCK_VALUE_RE, RISK_TOKENS, WIREFRAME_VALUE_RE, retarget_mock,
-    superseded_assets)
+    MOCK_VALUE_RE, RISK_TOKENS, WIREFRAME_VALUE_RE, grounding_stale,
+    head_sha, retarget_mock, superseded_assets)
 from cardlayout import section as _section  # noqa: E402
 from cardlayout import set_mock_line as _set_mock_line  # noqa: E402
 
@@ -85,11 +114,24 @@ KEY_RE = re.compile(r"^[A-Za-z0-9][\w.-]*$")
 WIRETEXT_RE = re.compile(r"https://wiretext\.app/w/[A-Za-z0-9_-]+")
 # Gate-bypass tokens live in cardlayout.RISK_TOKENS (a confirmed card
 # pre-clears schema-migration/deps-changed; the rest only route).
-COSIGN_RE = re.compile(r"P&D co-sign:", re.I)
+# The co-sign stamp is a contracted line shape, not a substring — column-0
+# anchored like MOCK_VALUE_RE/WIREFRAME_VALUE_RE; a `{...}` verdict is the
+# template's unsubstituted placeholder, not a signature.
+COSIGN_STAMP_RE = re.compile(r"^- \*\*P&D co-sign:\*\*\s*(.+)$", re.M)
 EXTERNAL_REF_RE = re.compile(
     r"(?:src|href)\s*=\s*[\"']https?://|@import|url\(\s*[\"']?https?://",
     re.I)
 PLACEHOLDER_TOKEN = "placeholder styling"
+FRAME_TOKEN_RE = re.compile(r"\b(?:browser|phone)\s*:", re.I)
+
+# The template's `##` sections are the card's completeness contract —
+# `Suggested Split` excluded (oversized-only by contract). A card that
+# can't produce all of them isn't draftable (SKILL.md), so a missing
+# section is a validation error, not a flag.
+REQUIRED_SECTIONS = (
+    "Marshal's Read", "System Context", "Visual Preview",
+    "Questions for the Operator", "Acceptance Criteria", "Scope Boundary",
+    "Externals Needed", "Execution Surface", "Flags", "Doctrine Grounding")
 
 
 def _find_project_root(start: Path) -> Path:
@@ -127,12 +169,14 @@ def _frontmatter(body: str) -> dict:
 
 def _derived_asks(body: str) -> int:
     """Count question bullets in `## Questions for the Operator`, excluding
-    the 'None — …' sentinel. The card carries the questions; the count is
-    derivable, so it isn't trusted to the prompt layer."""
+    only the contracted `None —` sentinel — a real question that happens to
+    start with the word 'None' ("None of the endpoints cover X — …") still
+    counts. The card carries the questions; the count is derivable, so it
+    isn't trusted to the prompt layer."""
     n = 0
     for line in _section(body, "Questions for the Operator").splitlines():
         m = re.match(r"^\s*-\s+(.*)$", line)
-        if m and not re.match(r"(?i)none\b", m.group(1)):
+        if m and not re.match(r"(?i)none\b\s*—", m.group(1)):
             n += 1
     return n
 
@@ -163,22 +207,40 @@ def _validate(cards: list) -> list:
                           f"(got {card.get('confidence')!r})")
         if not card.get("body"):
             errors.append(f"card {label}: missing 'body'")
+        else:
+            missing = [s for s in REQUIRED_SECTIONS
+                       if not _section(card["body"], s).strip()]
+            if missing:
+                errors.append(f"card {label}: missing required sections "
+                              f"{missing} — the template's section list is "
+                              "the completeness contract")
     return errors
 
 
-def _contract_warnings(card: dict, declared: list) -> tuple:
+def _contract_warnings(card: dict, declared: list, head: str = "") -> tuple:
     """Cross-check the machine-comparable contract: frontmatter
-    `declared_surface` must equal the Execution Surface tokens, and a
-    missing Execution Surface section is a defect, not an honest `none`.
-    Returns (warnings, contract_broken) — contract_broken routes to
-    Needs Attention."""
+    `declared_surface` must equal the Execution Surface tokens, and
+    `grounded_against.commit` must be non-empty — an empty commit leaves
+    the staleness tripwire dark (the template default `""` is exactly the
+    case this catches). A commit behind HEAD warns: the read may predate
+    the filing, not the card's fault. Returns (warnings, contract_broken)
+    — contract_broken routes to Needs Attention."""
     body = card.get("body") or ""
     warnings, broken = [], False
-    if not _section(body, "Execution Surface").strip():
-        warnings.append("no `## Execution Surface` section — a skipped step "
-                        "can't pass as a declared `none`")
+    fm = _frontmatter(body)
+    ga = fm.get("grounded_against")
+    commit = (ga or {}).get("commit") if isinstance(ga, dict) else None
+    if not commit:
+        warnings.append("grounded_against.commit empty — staleness "
+                        "detection can't benchmark this card")
         broken = True
-    fm_declared = _frontmatter(body).get("declared_surface")
+    elif head and grounding_stale(commit, head):
+        warnings.append(f"grounded_against.commit {commit} is behind HEAD "
+                        f"{head} — card filed against a stale read")
+    if not (isinstance(ga, dict) and ga.get("drafted")):
+        warnings.append("grounded_against.drafted missing — the stamp "
+                        "carries commit + date")
+    fm_declared = fm.get("declared_surface")
     if fm_declared is not None:
         fm_set = {t for t in fm_declared if t != "none"}
         if fm_set != set(declared):
@@ -278,6 +340,10 @@ def _mock_health(src_path: Path, warnings: list, key: str):
     elif EXTERNAL_REF_RE.search(head):
         warnings.append(f"{key}: mock references external assets "
                         "(http/CDN) — the file contract is self-contained")
+    if not FRAME_TOKEN_RE.search(head[:600]):
+        warnings.append(f"{key}: mock header declares no environment frame "
+                        "(`browser:{{route}}` | `phone:{{host-app|bare}}`) — "
+                        "the file contract names the frame it renders in")
     return head
 
 
@@ -359,6 +425,10 @@ def parse_args():
     p = argparse.ArgumentParser(description="File alignment cards into the Operator checklist.")
     p.add_argument("--orchestration-dir", required=True)
     p.add_argument("--cards", required=True, help="JSON file with drafted cards")
+    p.add_argument("--backlog-map",
+                   help="JSON of the cdo:backlog_map config ({stem: orch-relative"
+                   " path}) — the script resolves backlog file locations;"
+                   " supersedes --backlog-dir for mapped stems")
     p.add_argument("--backlog-dir",
                    help="Backlog dir for marker flips (default: {orch}/backlogs)")
     p.add_argument("--attention-threshold", type=int, default=80,
@@ -439,12 +509,38 @@ def normalize_backlog(value: str, orch: Path) -> str:
     return v[4:]
 
 
+def _backlog_files(raw: str, orch: Path):
+    """{stem: Path} from the --backlog-map JSON ({stem: orch-relative
+    path}) — the cdo: config value is the org's source of truth for where
+    backlog files live. Returns (files, error) — a malformed value is a
+    named input error, not a silent fallback."""
+    if not raw:
+        return {}, None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError as e:
+        return {}, f"--backlog-map isn't valid JSON: {e}"
+    if not isinstance(data, dict):
+        return {}, "--backlog-map must be a JSON object {stem: path}"
+    files = {}
+    for stem, rel in data.items():
+        p = Path(str(rel))
+        files[Path(str(stem)).stem] = p if p.is_absolute() else orch / p
+    return files, None
+
+
+def _backlog_file(backlog_dir: Path, files: dict, backlog_name: str) -> Path:
+    """Mapped file for the stem wins; unmapped stems fall back to the dir."""
+    return (files or {}).get(backlog_name) \
+        or backlog_dir / f"{backlog_name}.md"
+
+
 def flip_backlog_marker(backlog_dir: Path, backlog_name: str, key: str,
-                        dry: bool = False) -> bool:
+                        dry: bool = False, files: dict = None) -> bool:
     """Flip `- [ ]` or `- [?]` key → `- [A] key` (`[?]` = previously marked
     undraftable, now drafted). True also when the line is already [A]
     (idempotent re-file) — False only when the key has no backlog line."""
-    f = backlog_dir / f"{backlog_name}.md"
+    f = _backlog_file(backlog_dir, files, backlog_name)
     if not f.is_file():
         return False
     text = f.read_text(encoding="utf-8")
@@ -462,10 +558,10 @@ def flip_backlog_marker(backlog_dir: Path, backlog_name: str, key: str,
 
 
 def mark_undraftable(backlog_dir: Path, backlog_name: str, key: str,
-                     dry: bool = False) -> bool:
+                     dry: bool = False, files: dict = None) -> bool:
     """Flip `- [ ] key` → `- [?] key` — a recorded disposition, so the item
     stops re-scanning as if merely unaligned. `--story` re-selects it."""
-    f = backlog_dir / f"{backlog_name}.md"
+    f = _backlog_file(backlog_dir, files, backlog_name)
     if not f.is_file():
         return False
     text = f.read_text(encoding="utf-8")
@@ -484,6 +580,10 @@ def main():
     args = parse_args()
     orch = Path(args.orchestration_dir).resolve()
     backlog_dir = Path(args.backlog_dir) if args.backlog_dir else orch / "backlogs"
+    backlog_files, bmap_err = _backlog_files(args.backlog_map, orch)
+    if bmap_err:
+        print(json.dumps({"errors": [bmap_err]}))
+        sys.exit(1)
 
     try:
         payload = json.loads(Path(args.cards).read_text(encoding="utf-8"))
@@ -517,6 +617,7 @@ def main():
     project_root = _find_project_root(orch)
     cosign_required = (project_root / ".agents" / "skills" / "cdo-product"
                        / "SKILL.md").is_file()
+    head = head_sha(project_root)  # "" outside a git repo — compare skips
 
     drafts_dir = orch / "alignment" / "drafts"
     if not args.dry_run:
@@ -584,9 +685,11 @@ def main():
             warnings.append(
                 f"{key}: unrecognized Execution Surface tokens {unknown} — "
                 f"valid: {sorted(RISK_TOKENS)}. A typo fails closed at the gate.")
-        cwarns, contract_broken = _contract_warnings(card, declared)
+        cwarns, contract_broken = _contract_warnings(
+            card, declared, head or "")
         warnings += [f"{key}: {w}" for w in cwarns]
-        if cosign_required and not COSIGN_RE.search(card.get("body") or ""):
+        stamp = COSIGN_STAMP_RE.search(card.get("body") or "")
+        if cosign_required and not (stamp and "{" not in stamp.group(1)):
             warnings.append(
                 f"{key}: no `P&D co-sign:` stamp — cdo-product is installed, "
                 "so this card bypassed the second signature (drain-side and "
@@ -622,7 +725,7 @@ def main():
 
         marked = flip_backlog_marker(
             backlog_dir, normalize_backlog(card.get("backlog", "code"), orch),
-            key, dry=args.dry_run,
+            key, dry=args.dry_run, files=backlog_files,
         )
         entry = {
             "key": key, "section": section, "confidence": conf,
@@ -642,7 +745,7 @@ def main():
         ok = mark_undraftable(
             backlog_dir,
             normalize_backlog(item.get("backlog", "code"), orch),
-            key, dry=args.dry_run)
+            key, dry=args.dry_run, files=backlog_files)
         undrafted.append({"key": key, "reason": item.get("reason"),
                           "marker_flipped": ok})
         if not ok:
@@ -663,6 +766,9 @@ def main():
         "filed": filed,
         "needs_attention": [f["key"] for f in filed if f["section"] == "Needs Attention"],
         "routine": [f["key"] for f in filed if f["section"] == "Routine Review"],
+        "filed_count": len(filed),
+        "attention_count": sum(1 for f in filed if f["section"] == "Needs Attention"),
+        "routine_count": sum(1 for f in filed if f["section"] == "Routine Review"),
         "undraftable": undrafted,
         "gaps": gaps,
     }
@@ -684,6 +790,9 @@ def main():
             "filed": [f["key"] for f in filed],
             "needs_attention": result["needs_attention"],
             "routine": result["routine"],
+            "filed_count": result["filed_count"],
+            "attention_count": result["attention_count"],
+            "routine_count": result["routine_count"],
             "undraftable": undrafted,
             "gaps": gaps,
             **({"suggest": "cdo-review"} if filed else {}),

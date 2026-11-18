@@ -71,6 +71,11 @@ def parse_args():
         "skipped — help only advertises skills that actually exist.",
     )
     parser.add_argument(
+        "--detect",
+        help="detect.py output JSON — supplies the observed skill trees when "
+        "--installed-dirs is not given",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="Print detailed progress to stderr",
@@ -183,10 +188,16 @@ def main():
     # Optional: skip rows for skills that aren't installed in the target project.
     # A row advertises a skill (column index 1); if --installed-dirs is given,
     # only rows whose skill directory (containing SKILL.md) exists are merged.
+    installed_dirs = args.installed_dirs
+    if not installed_dirs and args.detect:
+        detect = json.loads(Path(args.detect).read_text(encoding="utf-8"))
+        droot = Path(detect.get("project_root") or "")
+        installed_dirs = ",".join(
+            str(droot / t) for t in detect.get("skill_trees") or [])
     skipped_rows = []
-    if args.installed_dirs:
+    if installed_dirs:
         installed = set()
-        for d in args.installed_dirs.split(","):
+        for d in installed_dirs.split(","):
             tree = Path(d.strip())
             if tree.is_dir():
                 installed.update(

@@ -375,6 +375,7 @@ def main():
             "uv": bool(shutil.which("uv")),
             "bun": bool(shutil.which("bun")),
         },
+        "skill_trees": sorted(skills.keys()),
         "soft_deps": {
             "owner_skills_present": owner_present,
             "owner_skills_missing": [s for s in OWNER_SKILLS if s not in owner_present],

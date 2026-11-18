@@ -56,10 +56,22 @@ bunx -p github:AfiqRosli/skills#v0.4.0 cdo
 
 ```
 <set> --list            # show what the set ships
+<set> --version         # print the fetched package version (verify the runner didn't serve a cached old one)
 <set> --dir <path>      # install into a different project root
 <set> --uninstall       # remove the set's skills from this project
 <set> --dry-run         # preview without writing
+<set> --no-setup        # skip the post-install upgrade leg (cdo)
 ```
+
+### Upgrading
+
+Re-run the same command with the new tag. The pin matters — an unpinned fetch can be served from the runner's cache and silently reinstall the old version (the manifest then correctly records that old version again).
+
+```bash
+bunx -p github:AfiqRosli/skills#v0.4.0 cdo
+```
+
+For `cdo`, when the bin detects a prior install (`cdo:` in `_bmad/config.yaml` or an existing orchestration tree) it also runs the setup chain headlessly — detect, propose, scaffold repair, config merge, help CSV, ship lane — using stored config, so a re-run is a complete upgrade with no agent round-trip. New `module.yaml` keys are applied with their defaults and listed in the output; change them via the `cdo-setup` skill (`--set key=value`). Fresh installs still route to the `cdo-setup` skill, where the config proposal earns its prompts. Requires `uv` or `python` on PATH for the setup leg; without it the skill files still install and the hint prints.
 
 ### After install
 

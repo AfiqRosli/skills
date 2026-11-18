@@ -9,80 +9,77 @@ description: 'Installs and configures the Autonomous Delivery Org (cdo) module i
 
 Installs, configures, and upgrades the `cdo` module — the orchestration layer of the Autonomous Delivery Org family. Department modules (`cdo-product`, `cdo-growth`, `cdo-academy`, `cdo-continuity`, …) install separately; this skill registers whichever it finds.
 
-**Scaffold-first, then adapt:** the module creates the `docs/orchestration/` tree it expects rather than reshaping itself per repo — consistent behavior across every project, with detected conventions filling in config. A second run detects the prior install and repairs/upgrades instead of duplicating.
+Every deterministic step runs through `scripts/` — same inputs, same outputs. Your judgment is reserved for what the scripts cannot decide: presenting the detected state and the proposal table, and resolving values the project can't supply itself.
 
 Act as an infrastructure installer with an ops mindset: verify prerequisites honestly, leave the project better-organized than found, and report exactly what happened.
 
-**Args:**
-- `--headless` / `-H` — detected defaults, no prompting; halts on missing hard prerequisites
-- `upgrade` — force the upgrade path
-- `--set key=value` (repeatable) — set a module config value directly; inline prose (`orchestration_dir is docs/ops`) also accepted
+## Resolution rules
 
-**Your output:** a ready-to-run orchestration home, a `cdo` section in `{project-root}/_bmad/config.yaml`, help-system registration, and a setup report — created / configured / registered / gaps.
+- Bare paths and `{skill-root}` (e.g. `scripts/detect.py`, `assets/module.yaml`) resolve from this skill's installed directory — including bare path values inside `customize.toml`.
+- `{project-root}` → the project working directory. Resolve it in every filesystem **argument**; inside config **values** it stays a literal token (`merge-config.py` expands it).
+- `{name}-resolved` → that value with `{project-root}` substituted for the real path.
+- `{temp}` → a scratch dir you create (`mktemp -d` or equivalent) for detect/answers/report JSON.
+- `{workflow.<name>}` → the resolved `customize.toml` value for `<name>`.
+
+**Args:**
+- `--headless` / `-H` — proposal accepted as-is, no prompts; every assumed value is memlogged
+- `upgrade` — force the upgrade branch regardless of detection
+- `--set key=value` / `--core-set key=value` (repeatable) — override a config value; unknown keys refuse
+
+**Your output:** a ready-to-run orchestration home, a `cdo` section in `{project-root}/_bmad/config.yaml`, help-system registration, and a setup report.
 
 ## On Activation
 
-Before anything else, two lines of orientation for first-timers: *"This scaffolds the orchestration tree under `docs/orchestration/`, writes a `cdo` config section into `{project-root}/_bmad/config.yaml`, and registers capabilities with the help system — takes about a minute."* Then invite questions about any row of the upcoming config table.
-
-Run these together in one pass:
-
-1. Read `./assets/module.yaml` for module identity and variable definitions.
-2. Run the deterministic pre-pass — it emits one JSON blob: hard prerequisites, soft deps, detected conventions, prior-install state, ship-lane branch topology (`git_lane`), **the stored `cdo:` config section verbatim** (`prior_cdo_config`), and a `gate` verdict:
+1. Resolve customization: `uv run {project-root}/_bmad/scripts/resolve_customization.py --skill {skill-root} --project-root {project-root} --key workflow` → `{workflow.*}` values. No resolver → read `customize.toml` directly.
+2. Read `assets/module.yaml` for module identity and variable definitions. It is the cdo module's install manifest — its values land in `{project-root}/_bmad/config.yaml`; it is not this skill's customization surface (`customize.toml` is).
+3. Run the deterministic pre-pass — it emits one JSON blob: hard prerequisites, soft deps, detected conventions, prior-install state, ship-lane topology (`git_lane`), the stored `cdo:` config verbatim (`prior_cdo_config`), and a `gate` verdict:
 
    ```bash
-   uv run ./scripts/detect.py --project-root "{project-root-resolved}" -o {temp}/detect.json
+   uv run scripts/detect.py --project-root "{project-root-resolved}" -o {temp}/detect.json
    ```
 
-   If `uv`/`python` is unavailable, perform the equivalent checks by hand (see `detect.py --help` for what it scans) — batch the probes, don't serialize them.
+   If `uv`/`python` is unavailable, perform the equivalent checks by hand (see `detect.py --help`) — batch the probes, don't serialize them.
 
-3. **Prerequisite gate.** Hard requirements: a git repo AND an official BMAD install (`{project-root}/_bmad/config.yaml` with real module sections — a stub file fails). Missing either → halt and report what must exist first; in `--headless` emit `{"status": "blocked", "missing": [...]}`. Soft deps (`cdo-code-e2e`, other owner skills, wiretext MCP, `cdo-*` dept modules) → warn and continue, registering each as a gap. Surface any `warnings` from detection (stub config, dual TOML/YAML ambiguity).
-4. **Fresh install vs upgrade.** `prior_install` or `orchestration_trees_found` → upgrade: stored values and detected state become the proposal defaults; repair only what's missing. Otherwise fresh install. State the decision before proceeding.
+4. **Prerequisite gate.** Hard requirements: a git repo AND an official BMAD install (`{project-root}/_bmad/config.yaml` with real module sections — a stub fails). The module's whole model assumes BMAD conventions, so setup refuses rather than silently degrades when the foundation isn't there: halt, report what must exist first; in `--headless` emit `{"status": "blocked", "reason": "...", "missing": [...]}`. Soft deps (`cdo-code-e2e`, wiretext MCP, `cdo-*` dept modules) → warn and continue, registering each as a gap. Surface detection `warnings`.
+
+5. **Mode.** `upgrade` when detection finds a prior install — or whenever the `upgrade` arg is passed, even with no prior install (a fresh tree under upgrade mode just repairs/scaffolds; note it, don't refuse). Otherwise `fresh-install`. State the decision before proceeding.
+
+Open with one breath of orientation — what this writes (orchestration tree, config section, help CSV, ship lane) and roughly how long — then move to the proposal table.
 
 ## Collect Configuration
 
-Build the proposed config **with the script**, not by hand — it layers `--set` overrides > stored prior config > detected values > `module.yaml` defaults, derives `backlog_map` from detected dept modules, and emits both a human table and the answers JSON:
+Build the proposed config **with the script**, not by hand — it layers `--set` overrides > stored prior config > detected values > `module.yaml` defaults, derives `backlog_map` from detected dept modules, and emits both a human table and the answers JSON (plus `answers.json.report.json` — the per-value source trail):
 
 ```bash
-uv run ./scripts/propose-config.py --detect {temp}/detect.json --module-yaml ./assets/module.yaml -o {temp}/answers.json
+uv run scripts/propose-config.py --detect {temp}/detect.json --module-yaml assets/module.yaml [--set key=value] [--core-set key=value] -o {temp}/answers.json
 ```
 
-Present the `proposed` table to the user — one amendable summary ("all fine" or a list of changes). Never interview variable-by-variable. If they amend, re-run with `--set key=value` per change. In `--headless`, the proposal IS the answers (still honor any `--set` args).
+Present the `proposed` table — one amendable summary ("all fine" or a list of changes). Never interview variable-by-variable. If they amend, re-run with `--set` per change. In `--headless`, the proposal IS the answers — append an `assumption` memlog entry per defaulted value via `{project-root}/_bmad/scripts/memlog.py`.
 
 Notes:
-- Core config keys (`user_name`, `communication_language`, `document_output_language`, `output_folder`) already in `{project-root}/_bmad/config.yaml` are protected automatically — `detect` reports them as `core_keys_present` and `propose-config` omits the core block (pass `--core-set` to deliberately change one). `--no-core` remains as an explicit override.
+- Core config keys (`user_name`, `communication_language`, `document_output_language`, `output_folder`) already in `{project-root}/_bmad/config.yaml` are protected automatically — `detect` reports them as `core_keys_present` and `propose-config` omits the core block (pass `--core-set` to deliberately change one).
 - `ship_target` default is `preview` — intentional; production stays Operator-gated. Don't offer to change it silently.
 - If detection found no sprint yaml / story dir / devlog dir, say so on the row rather than letting a silent default hide it.
 
 ## Write & Scaffold
 
-Resolve `{project-root}` to the real path in every path argument — the token stays literal only inside config *values*.
+**Scaffold** the orchestration tree — idempotent; existing files are never overwritten; `--answers` supplies the orchestration dir, the dept `backlog_map`, and the configured directories to create. These three calls write to disjoint targets and may run in parallel:
 
-1. **Scaffold** the orchestration tree — idempotent; existing files are never overwritten; dept backlogs seed only for installed dept modules. These three calls write to disjoint targets and may run in parallel:
+```bash
+uv run scripts/scaffold.py --project-root "{project-root-resolved}" --answers {temp}/answers.json --module-yaml assets/module.yaml --report {temp}/answers.json.report.json --mode "{mode}" --seeds "{workflow.seeds_dir}"
+uv run scripts/merge-config.py --config-path "{project-root}/_bmad/config.yaml" --user-config-path "{project-root}/_bmad/config.user.yaml" --module-yaml assets/module.yaml --answers {temp}/answers.json --legacy-dir "{project-root}/_bmad"
+uv run scripts/merge-help-csv.py --target "{project-root}/_bmad/module-help.csv" --source "{workflow.module_help_source}" --legacy-dir "{project-root}/_bmad" --module-code cdo --detect {temp}/detect.json
+```
 
-   ```bash
-   uv run ./scripts/scaffold.py --project-root "{project-root-resolved}" --orchestration-dir "{orchestration_dir-resolved}" --dept-modules "{comma-separated dept modules from detection}" --version "0.1.0" --mode "{fresh-install|upgrade}"
-   uv run ./scripts/merge-config.py --config-path "{project-root}/_bmad/config.yaml" --user-config-path "{project-root}/_bmad/config.user.yaml" --module-yaml ./assets/module.yaml --answers {temp}/answers.json --legacy-dir "{project-root}/_bmad"
-   uv run ./scripts/merge-help-csv.py --target "{project-root}/_bmad/module-help.csv" --source ./assets/module-help.csv --legacy-dir "{project-root}/_bmad" --module-code cdo --installed-dirs "{project-root}/.agents/skills,{project-root}/skills,{project-root}/.devin/skills"
-   ```
+`merge-config.py` preserves stored keys the answers don't redefine — an upgrade repairs, never deletes a hand-tuned value. `merge-help-csv.py` registers only skills detection actually found — unbuilt siblings aren't advertised. `scaffold.py` also copies the proposal report to `setup-report.json` beside the setup log — which values were overridden, stored, detected, or defaulted stays recoverable after `{temp}` is gone. All emit JSON; on non-zero exit, surface the error and stop.
 
-   `merge-config.py` preserves stored keys the answers don't redefine — an upgrade repairs, never deletes a hand-tuned value. `merge-help-csv.py` with `--installed-dirs` registers only skills that exist on disk — unbuilt siblings aren't advertised. All emit JSON; on non-zero exit, surface the error and stop.
+**Lane setup** — make the `ship_target` branch real:
 
-2. **Create configured directories** that don't exist yet — resolve `{project-root}` for filesystem paths only; the stored config keeps the literal token.
+```bash
+uv run scripts/ensure-lane.py --project-root "{project-root-resolved}" --answers {temp}/answers.json
+```
 
-3. **Lane setup** — make the `ship_target` branch real. Run once config is resolved:
-
-   ```bash
-   uv run ./scripts/ensure-lane.py --project-root "{project-root-resolved}" --lane "{ship_target}"
-   ```
-
-   The org's ship model needs the lane to exist: automation commits land on `ship_target` (default `preview`), production refs stay Operator-gated. Interpret the JSON status:
-
-   - `created_and_switched` — the checkout now sits on the lane (or a local branch tracking the single remote lane). The common path on a repo sitting on `main`.
-   - `created_not_switched` — lane created at the default branch (or remote lane) but the checkout stays put: user was mid-feature on another branch, or `--no-switch` was passed. Ship work still lands correctly — lanes are pushed, not sat on.
-   - `already_on_lane` / `exists_not_checked_out` — nothing to do; report which.
-   - `deferred` — zero-commit repo; a branch can't point at an unborn HEAD. Record a gap: create the lane after the first commit (the greenfield scaffold's wire stage is the usual producer of it).
-
-   Never force-create over an existing lane and never switch the user's checkout when they're mid-feature.
+Every status is a successful outcome, not an error — ship work lands on the lane via push, so an unswitched checkout is fine. On `deferred` (zero-commit repo), record a gap: create the lane after the first commit.
 
 ## Report
 
@@ -92,27 +89,30 @@ Close with a setup report:
 - **Configured** — the written config table (or what changed on upgrade — call out preserved values)
 - **Registered** — help rows actually written + department modules discovered with their backlog files
 - **Lane** — ship-lane result (`created_and_switched` / `exists` / `deferred` with reason)
-- **Gaps** — missing soft deps with how to fill them (e.g., install `cdo-code-e2e` before code batches; register wiretext MCP for rendered Operator surfaces; create the `{ship_target}` lane after the first commit when deferred)
+- **Gaps** — missing soft deps with how to fill them (e.g., install `cdo-code-e2e` before code batches; create the `{ship_target}` lane after the first commit when deferred)
 - **Next** — "Talk to `cdo-orchestrator` to run your first batch" — or a readiness checklist when the gate was partial
-- **Commit** — offer to `git add` the orchestration tree + config (git is a hard prereq, so it's always available)
+- **Commit** — offer to `git add` the orchestration tree + config
 
-In `--headless`, emit the same report as JSON with `status` of `"installed"`, `"upgraded"`, or `"blocked"`.
+When `{workflow.on_complete}` is set, execute it now.
+
+**Headless contract.** Never commit in `--headless` — report `"commit": "pending"` and let the caller decide. Memlog every assumption made without the user (mode, defaulted values, lane action, registered gaps) through `{project-root}/_bmad/scripts/memlog.py` as it happens. Return minimal JSON:
+
+```json
+{"status": "complete|blocked", "mode": "installed|upgraded", "commit": "pending",
+ "paths": {"orchestration": "…", "setup_log": "…/setup-log.md",
+          "setup_report": "…/setup-report.json", "memlog": "…/memlog.md"}}
+```
+
+On `blocked`, include a one-line `reason` and still return the memlog path.
 
 ## No Python/uv Fallback
 
-The scripts are the preferred path, but a missing interpreter must not dead-end the install. Manual equivalents:
+The scripts are the preferred path; a missing interpreter gets a **partial** install, not an equivalent one — the merge contract (result templates, metadata keys, legacy fallback, core-key migration, user-setting split) lives in the scripts and is not reproduced here. Do:
 
 - **Detection** — the checks in `detect.py --help` done by glob/read.
-- **Scaffold** — `mkdir -p` the tree; copy each seed from `./assets/seeds/` only when the target is absent.
+- **Scaffold** — `mkdir -p` the tree; copy each seed from `assets/seeds/` only when the target is absent.
 - **Config write** — replace the `cdo:` section in `{project-root}/_bmad/config.yaml` wholesale, but first carry any existing keys into the new section (preserve what you don't recognize); write `user_name`/`communication_language` to `config.user.yaml` instead.
-- **Help CSV** — append rows from `./assets/module-help.csv` for installed skills only; remove stale `cdo` rows first.
-- **Lane** — `git switch -c {ship_target}` when the repo has commits, the lane is missing, and the checkout sits on the default branch; `git branch {ship_target} {default-branch}` when mid-feature on another branch; skip entirely on a zero-commit repo.
+- **Help CSV** — append rows from `assets/module-help.csv` for installed skills only; remove stale `cdo` rows first.
+- **Lane** — `git switch -c {ship_target}` when the repo has commits, the lane is missing, and the checkout sits on the default branch; `git branch {ship_target} {default-branch}` when mid-feature; skip entirely on a zero-commit repo.
 
-State clearly that the manual path was used — it's the exception, not the norm.
-
-## Design Notes
-
-- **Why gated:** the module's whole model assumes BMAD conventions (config, sprint artifacts, owner skills). Rather than silently degrading, setup refuses when the foundation isn't there.
-- **Why scaffold-first:** predictable paths let `cdo-batch`, `cdo-watch`, and `cdo-handoff` make hard guarantees about state files — and every install behaves identically, so doctrine and ledgers port across projects.
-- **Why detect-everything-then-confirm:** twelve questions is tedium; one proposed table the user amends is one touchpoint. Detection does the homework; the Operator signs off.
-- **Why `propose-config.py`:** layering four value sources (overrides > stored > detected > defaults) is deterministic merge work — a script does it losslessly; a prompt would eventually drop a stored value.
+Then report the install **incomplete** — the full config merge and lane bookkeeping still owe a Python run (`merge-config.py`, `merge-help-csv.py`, `ensure-lane.py`). Do not claim a finished install.

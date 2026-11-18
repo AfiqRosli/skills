@@ -116,7 +116,8 @@ def insert_yaml_entry(text: str, epic: int, key: str, status: str) -> str:
                 insert_at = i
                 break
             continue
-        if re.match(r"^  \S", lines[i]):
+        if re.match(r"^  \S", lines[i]) or re.match(r"^\S", lines[i]):
+            # another key — or a top-level key — ends the dev_status block
             insert_at = i
             break
     if insert_at is None:

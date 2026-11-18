@@ -153,7 +153,8 @@ def insert_yaml_entry(text: str, epic: int, key: str, status: str) -> str:
                 insert_at = i
                 break
             continue
-        if re.match(r"^  \S", lines[i]):     # another key ends the block
+        if re.match(r"^  \S", lines[i]) or re.match(r"^\S", lines[i]):
+            # another key — or a top-level key — ends the dev_status block
             insert_at = i
             break
     if insert_at is None:
@@ -290,14 +291,14 @@ def main():
             else:
                 mapped = f"{prefix}-{mint_slug(clean_title)}"
         else:
-            mm = f"{next_free_13:02d}"
-            while f"13-{mm}" in mints_used or \
-                    any(k.startswith(f"13-{mm}-") for k in yaml_keys):
+            # already-minted keys count too — a bare item must not collide
+            # with a prefix-minted or earlier bare-minted 13-MM story number
+            while any(k.startswith(f"13-{next_free_13:02d}-")
+                      for k in list(yaml_keys) + list(keymap.values())):
                 next_free_13 += 1
-                mm = f"{next_free_13:02d}"
-            mapped = f"13-{mm}-{mint_slug(title)}"
+            mapped = f"13-{next_free_13:02d}-{mint_slug(title)}"
             next_free_13 += 1
-            mints_used.add(mm)
+            mints_used.add(mapped)
         keymap[skey] = mapped
         if mapped not in yaml_keys:
             if pm:
@@ -366,6 +367,7 @@ def main():
                                      skey, release, date, approach)
             ops["story_files"].append(str(sfile))
             if not dry:
+                sfile.parent.mkdir(parents=True, exist_ok=True)
                 sfile.write_text(content, encoding="utf-8")
         # epics section for minted keys lacking one
         mm = re.match(r"(\d+)-(\d+)", new_key)
@@ -542,8 +544,9 @@ def main():
                  f"re-keyed to NN-MM-slug ({len(minted)} minted entries); CDO "
                  f"devlogs merged under devlog/{channel}/{sprint_date}; record: "
                  f"logs/sprint-key-migration-{date}.json\n")
-        chrono.write_text(chrono.read_text(encoding="utf-8").rstrip() +
-                          "\n" + entry, encoding="utf-8")
+        existing = chrono.read_text(encoding="utf-8").rstrip() \
+            if chrono.is_file() else "# Chronology\n"
+        chrono.write_text(existing + "\n" + entry, encoding="utf-8")
 
     print(json.dumps({"dry_run": dry, **record}, indent=2))
     sys.exit(0)

@@ -1,0 +1,21 @@
+# DO NOT EDIT -- overwritten on every update.
+#
+# Workflow customization surface for cdo-setup.
+# Team overrides:     {project-root}/_bmad/custom/cdo-setup.toml
+# Personal overrides: {project-root}/_bmad/custom/cdo-setup.user.toml
+
+[workflow]
+
+# --- Universal defaults. Merge: scalars override, arrays append. ---
+activation_steps_prepend = []
+activation_steps_append = []
+persistent_facts = []
+on_complete = ""
+
+# --- Skill-specific points ---
+# Seed tree copied into the orchestration home (bare path resolves from
+# the skill root; use {project-root}/... for an org-owned tree).
+seeds_dir = "assets/seeds"
+
+# Help rows merged into {project-root}/_bmad/module-help.csv.
+module_help_source = "assets/module-help.csv"

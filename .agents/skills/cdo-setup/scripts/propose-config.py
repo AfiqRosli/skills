@@ -122,6 +122,20 @@ def main():
     var_keys = [k for k, v in module_yaml.items()
                 if isinstance(v, dict) and ("prompt" in v or "default" in v)]
 
+    # unknown override keys never match a var and silently no-op — name them
+    unknown = sorted(set(overrides) - set(var_keys))
+    if unknown:
+        print(json.dumps({"errors": [
+            f"unknown --set key(s): {', '.join(unknown)} — "
+            f"valid: {', '.join(var_keys)}"]}))
+        sys.exit(1)
+    unknown_core = sorted(set(core_overrides) - set(CORE_VARS))
+    if unknown_core:
+        print(json.dumps({"errors": [
+            f"unknown --core-set key(s): {', '.join(unknown_core)} — "
+            f"valid: {', '.join(CORE_VARS)}"]}))
+        sys.exit(1)
+
     proposed = []   # [(key, value, source)]
     module_answers = {}
 

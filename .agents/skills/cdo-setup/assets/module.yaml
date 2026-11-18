@@ -1,3 +1,6 @@
+# Install manifest for the cdo module — these values land in the project's
+# _bmad/config.yaml at setup time. It is NOT a customization surface for the
+# cdo-setup skill itself; that is customize.toml.
 code: cdo
 name: Autonomous Delivery Org
 description: "24/7 autonomous delivery orchestration — Operator-gated alignment, headless batch dispatch through cdo-code-e2e, ops-floor monitoring, and journaled decision memory. Department modules (cdo-*) install separately."

@@ -27,8 +27,11 @@ change this file, copy it to every scripts/ dir that carries it.
 """
 from __future__ import annotations
 
+import argparse
+import json
 import re
 import subprocess
+import sys
 from pathlib import Path
 
 try:
@@ -238,3 +241,66 @@ def retarget_mock(body: str, key: str, new_assets_rel: str) -> str:
     tail = old.split(marker, 1)[1]
     new_val = f"{new_assets_rel}/{tail}" if tail else new_assets_rel
     return set_mock_line(body, new_val)
+
+
+def main() -> None:
+    """Self-describing CLI: dump the layout contract, or resolve one key.
+
+      uv run cardlayout.py                     # the contract as JSON
+      uv run cardlayout.py --orchestration-dir <orch> <key>
+    """
+    p = argparse.ArgumentParser(
+        description="The cdo alignment-card layout contract — bays, archive "
+                    "shape, and per-key path resolution.")
+    p.add_argument("key", nargs="?", help="card/story key to resolve")
+    p.add_argument("--orchestration-dir", "-d",
+                   help="orchestration root (required with a key)")
+    p.add_argument("-o", "--output", help="write JSON to file instead of stdout")
+    args = p.parse_args()
+
+    if not args.key:
+        out = {
+            "contract": {
+                "bays": sorted(BAYS),
+                "archive": "alignment/YYYY/MM/DD/{key}.md",
+                "review_staging": "alignment/reviews/{key}.review-{n}.md",
+                "assets": "{bay}/assets/{key}/",
+                "mock_file": MOCK_FILENAME,
+                "risk_tokens": sorted(RISK_TOKENS),
+                "visual_preview_sentinels": [VP_NO_UI, VP_UNAVAILABLE + "<reason>"],
+            }
+        }
+        code = 0
+    else:
+        if not args.orchestration_dir:
+            print(json.dumps({"errors": [
+                "--orchestration-dir is required when resolving a key"]}))
+            sys.exit(2)
+        orch = Path(args.orchestration_dir).resolve()
+        card = confirmed_card(orch, args.key)
+        out = {
+            "key": args.key,
+            "confirmed_card": (
+                str(card.relative_to(orch)).replace("\\", "/")
+                if card else None),
+            "review_staging": str(
+                staged_review_doc(orch, args.key, 1)
+                .relative_to(orch)).replace("\\", "/"),
+            "status": "confirmed" if card else "absent",
+        }
+        code = 0 if card else 1
+
+    blob = json.dumps(out, indent=2)
+    if args.output:
+        Path(args.output).write_text(blob, encoding="utf-8")
+    else:
+        print(blob)
+    sys.exit(code)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except Exception as e:
+        print(json.dumps({"errors": [f"runtime error: {e}"]}))
+        sys.exit(2)

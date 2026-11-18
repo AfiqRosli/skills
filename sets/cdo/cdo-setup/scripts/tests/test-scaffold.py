@@ -100,6 +100,78 @@ class TestScaffold(unittest.TestCase):
             )
             self.assertEqual(proc.returncode, 1)
 
+    def test_unresolved_project_root_token_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = subprocess.run(
+                [
+                    sys.executable, str(SCRIPT),
+                    "--project-root", tmp,
+                    "--seeds", str(SEEDS),
+                    "--orchestration-dir", "{project-root}/docs/orchestration",
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(proc.returncode, 2)
+            self.assertIn("project-root", proc.stdout)
+            self.assertFalse((Path(tmp) / "{project-root}").exists())
+
+    def _answers(self, tmp, **module):
+        p = Path(tmp) / "answers.json"
+        p.write_text(json.dumps({"core": {}, "module": module}),
+                     encoding="utf-8")
+        return str(p)
+
+    def test_answers_drives_orch_dir_and_backlog_map(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            answers = self._answers(
+                tmp,
+                orchestration_dir="{project-root}/ops/orch",
+                backlog_map={"code": "backlogs/code.md",
+                             "growth": "backlogs/content.md"})
+            proc, data = run_scaffold(Path(tmp), ["--answers", answers])
+            self.assertEqual(proc.returncode, 0, proc.stderr)
+            orch = Path(tmp) / "ops" / "orch"
+            self.assertTrue((orch / "doctrine.md").is_file())
+            # backlog_map — not --dept-modules — decides dept backlogs
+            self.assertTrue((orch / "backlogs" / "content.md").is_file())
+
+    def test_answers_creates_configured_dirs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            answers = self._answers(
+                tmp,
+                devlog_dir="{project-root}/logs/devlog",
+                sprint_status_path="{project-root}/out/sprint.yaml")
+            proc, data = run_scaffold(Path(tmp), ["--answers", answers])
+            self.assertEqual(proc.returncode, 0)
+            # dir-shaped values get created; file-shaped values do not
+            self.assertTrue((Path(tmp) / "logs" / "devlog").is_dir())
+            self.assertFalse((Path(tmp) / "out" / "sprint.yaml").exists())
+
+    def test_report_copied_into_orch(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            report = Path(tmp) / "answers.json.report.json"
+            report.write_text('{"proposed": []}', encoding="utf-8")
+            proc, data = run_scaffold(Path(tmp), ["--report", str(report)])
+            self.assertEqual(proc.returncode, 0)
+            out = Path(tmp) / "docs" / "orchestration" / "setup-report.json"
+            self.assertTrue(out.is_file())
+            log = (Path(tmp) / "docs" / "orchestration" / "setup-log.md") \
+                .read_text(encoding="utf-8")
+            self.assertIn("report=setup-report.json", log)
+
+    def test_module_yaml_supplies_version(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            myaml = Path(tmp) / "module.yaml"
+            myaml.write_text("module_version: 9.9.9\n", encoding="utf-8")
+            proc, _ = run_scaffold(Path(tmp),
+                                   ["--module-yaml", str(myaml),
+                                    "--mode", "upgrade"])
+            self.assertEqual(proc.returncode, 0)
+            log = (Path(tmp) / "docs" / "orchestration" / "setup-log.md") \
+                .read_text(encoding="utf-8")
+            self.assertIn("version=9.9.9", log)
+
 
 if __name__ == "__main__":
     unittest.main()

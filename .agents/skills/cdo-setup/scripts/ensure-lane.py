@@ -51,7 +51,11 @@ def parse_args():
         description="Ensure the configured ship-target branch exists and, when safe, is checked out."
     )
     p.add_argument("--project-root", required=True, help="Absolute path to the project root")
-    p.add_argument("--lane", required=True, help="Ship-target branch name (e.g. preview)")
+    p.add_argument("--lane", default="",
+                   help="Ship-target branch name (default: --answers "
+                        "module.ship_target, else 'preview')")
+    p.add_argument("--answers", default="",
+                   help="propose-config answers.json — supplies ship_target")
     p.add_argument("--no-switch", action="store_true",
                    help="Create the lane if missing but never change the checked-out branch")
     p.add_argument("-o", "--output", help="Write JSON to file instead of stdout")
@@ -98,6 +102,10 @@ def main() -> None:
     args = parse_args()
     root = Path(args.project_root).resolve()
     lane = args.lane.strip()
+    if not lane and args.answers:
+        answers = json.loads(Path(args.answers).read_text(encoding="utf-8"))
+        lane = str((answers.get("module") or {}).get("ship_target") or "").strip()
+    lane = lane or "preview"
 
     result = {
         "script": "cdo-ensure-lane",

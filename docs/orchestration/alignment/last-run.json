@@ -1,0 +1,18 @@
+{
+  "at": "2026-11-18T14:30:52",
+  "filed": [
+    "version-upgrade-01"
+  ],
+  "needs_attention": [
+    "version-upgrade-01"
+  ],
+  "routine": [],
+  "filed_count": 1,
+  "attention_count": 1,
+  "routine_count": 0,
+  "undraftable": [],
+  "gaps": [
+    "no `version-bump` execution-surface token \u2014 version-field package.json edits must declare `deps-changed` (nearest protective token) or stall at the manifest gate; RISK_TOKENS predates the release-train surface"
+  ],
+  "suggest": "cdo-review"
+}

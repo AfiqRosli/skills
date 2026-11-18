@@ -15,12 +15,13 @@ cdo:
   description: 24/7 autonomous delivery orchestration — Operator-gated alignment,
     headless batch dispatch through cdo-code-e2e, ops-floor monitoring, and journaled
     decision memory. Department modules (cdo-*) install separately.
-  version: 0.1.0
+  version: 0.1.1
   default_selected: false
   orchestration_dir: '{project-root}/docs/orchestration'
   sprint_status_path: '{project-root}/_bmad-output/implementation-artifacts/sprint-status.yaml'
   story_location: '{project-root}/_bmad-output/implementation-artifacts/stories'
   devlog_dir: '{project-root}/docs/orchestration/devlog'
+  product_docs: '{project-root}/docs/product'
   package_manager: npm
   health_commands: auto-detected from package.json
   earned_autonomy: 'off'

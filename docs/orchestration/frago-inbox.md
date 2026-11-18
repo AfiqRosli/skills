@@ -19,3 +19,8 @@ platform backlog as `platform-01`; alignment card drafted
 ### 2026-11-17 19:02
 "update the readme" — document the installed org (orchestration home,
 preview lane, gated push) in README.md; small doc fix, run inline
+
+### 2026-11-18 14:15
+"upgrade project version" — work request; intaked to version-upgrade
+backlog as `version-upgrade-01`, unaligned — awaits the alignment leg
+→ processed 2026-11-18 14:15 — routed, queued `[ ]`

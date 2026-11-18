@@ -19,6 +19,7 @@ confidence — what the machine knows it's unsure about goes first.
 
 <!-- flagged or confidence < 80% — Operator attention first -->
 
+- [ ] version-upgrade-01 — Upgrade project version (cut v0.4.0 carrying the cdo-align hardening) | conf 87% | flags: ungrounded:source, contract-break, dirty-tree, calibration-thin, es-declaration | asks: 2 | draft: alignment/drafts/version-upgrade-01.md
 ## Routine Review
 
 <!-- confident drafts awaiting sign-off -->

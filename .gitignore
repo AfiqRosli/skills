@@ -6,3 +6,4 @@ Thumbs.db
 
 # skill-analysis tooling output
 .analysis/
+.pytest_cache/

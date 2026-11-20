@@ -3,9 +3,9 @@
   "sets": {
     "srm": {
       "package": "skills",
-      "version": "0.4.0",
+      "version": "0.6.0",
       "source": "github:AfiqRosli/skills",
-      "installedAt": "2026-11-18T06:51:23.510Z",
+      "installedAt": "2026-11-20T09:12:54.595Z",
       "skills": [
         "srm-setup",
         "srm-sync"
@@ -13,9 +13,9 @@
     },
     "cdo": {
       "package": "skills",
-      "version": "0.4.0",
+      "version": "0.6.0",
       "source": "github:AfiqRosli/skills",
-      "installedAt": "2026-11-18T13:47:08.634Z",
+      "installedAt": "2026-11-20T09:12:45.847Z",
       "skills": [
         "cdo-academy",
         "cdo-align",
@@ -48,9 +48,9 @@
     },
     "scaffold": {
       "package": "skills",
-      "version": "0.4.0",
+      "version": "0.6.0",
       "source": "github:AfiqRosli/skills",
-      "installedAt": "2026-11-18T06:51:23.900Z",
+      "installedAt": "2026-11-20T09:12:54.960Z",
       "skills": [
         "project-greenfield-scaffold"
       ]

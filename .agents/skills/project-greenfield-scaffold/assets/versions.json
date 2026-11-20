@@ -2,7 +2,6 @@
   "$schema_note": "Pinned spine manifest for greenfield scaffolds. Bump deliberately — scaffold.py injects these into package.json; do not hand-edit template/package.json versions.",
   "resolved_at": "2026-10-29",
   "dependencies": {
-    "@better-auth/infra": "^0.4.25",
     "@elysiajs/cors": "^1.4.2",
     "@mdi/font": "^7.4.47",
     "@neondatabase/serverless": "^1.2.0",
@@ -59,7 +58,7 @@
     "vuetify": "^4.3.1"
   },
   "flag_stripped_deps": {
-    "auth": ["better-auth", "@better-auth/infra", "@polar-sh/better-auth", "@polar-sh/sdk"],
+    "auth": ["better-auth", "@polar-sh/better-auth", "@polar-sh/sdk"],
     "billing": ["@polar-sh/better-auth", "@polar-sh/sdk"],
     "db": ["drizzle-orm", "drizzle-kit", "@neondatabase/serverless", "pg", "@types/pg"],
     "email": ["resend"],

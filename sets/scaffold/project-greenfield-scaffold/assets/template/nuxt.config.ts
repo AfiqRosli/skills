@@ -66,6 +66,12 @@ export default defineNuxtConfig({
   ],
   pages: true,
   devtools: { enabled: true },
+  // Agent scratch dirs (.cdo-work drain worktrees, .blobs stores) can
+  // hold full worktree checkouts with their own node_modules — .gitignore
+  // does NOT stop chokidar. `ignore` feeds Nuxt's isIgnored gate, keeping
+  // them out of every dir scan (pages, components, composables, imports)
+  // and every file watcher the framework owns.
+  ignore: [".cdo-work/**", ".blobs/**"],
   app: {
     head: {
       title: "{{PROJECT_NAME}}",
@@ -138,8 +144,9 @@ export default defineNuxtConfig({
   typescript: {
     tsConfig: {
       // .agents holds agent skills whose asset templates contain raw
-      // .ts/.vue files — keep them out of `nuxt typecheck`.
-      exclude: ["../.agents/**"],
+      // .ts/.vue files; .cdo-work/.blobs are agent scratch dirs — keep
+      // them all out of `nuxt typecheck` / `vue-tsc`.
+      exclude: ["../.agents/**", "../.cdo-work/**", "../.blobs/**"],
     },
   },
   // Disable server source maps in production — they generate 180+ extra
@@ -248,6 +255,23 @@ export default defineNuxtConfig({
   },
   // @endflag deploy
   vite: {
+    server: {
+      watch: {
+        // Belt-and-braces for `ignore` above: explicit chokidar ignore so
+        // scratch dirs stay out of the dev watcher even if a future Nuxt
+        // version stops routing server.watch.ignored through isIgnored.
+        // A worktree's node_modules is tens of thousands of watched files —
+        // this is the real dev-lag fix.
+        ignored: [
+          "**/.git/**",
+          "**/node_modules/**",
+          "**/dist/**",
+          "**/test-results/**",
+          "**/.cdo-work/**",
+          "**/.blobs/**",
+        ],
+      },
+    },
     css: {
       // Parallelize SASS compilation across worker threads — Vuetify's
       // per-component SASS extraction produces hundreds of small style

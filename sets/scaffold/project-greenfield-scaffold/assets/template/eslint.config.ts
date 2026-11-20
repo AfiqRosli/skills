@@ -57,6 +57,8 @@ export default withNuxt(
       "dist/**",
       "nuxt.config.ts",
       ".agents/**",
+      ".cdo-work/**",
+      ".blobs/**",
     ],
   },
 ).append(

@@ -15,9 +15,9 @@ What "the house stack" actually is — distilled from a production codebase and 
 | API | Elysia via `nuxt-elysia`; `server/api.ts` is the root app, `nuxtElysia.path: "/api"` auto-prefixes | elysia ^1, nuxt-elysia |
 | Validation | `t.Object` schemas per route on the Elysia route options | — |
 | Database | Drizzle ORM; default client `drizzle-orm/neon-http` (Neon serverless); migrations via drizzle-kit → `drizzle/` | ^0.45 |
-| Transactions | `server/db/tx.ts` `withDbTx` — dedicated `pg` Client + `drizzle-orm/node-postgres` per call. neon-http has NO `db.transaction()` — never fake it with ordered writes | pg ^8 |
+| Transactions | `server/db/tx.ts` `withDbTx` — dedicated `pg` Client + `drizzle-orm/node-postgres` per call. neon-http has no `db.transaction()` — never fake it with ordered writes | pg ^8 |
 | Auth | better-auth (`auth.ts` root) + drizzle adapter; client `lib/auth-client.ts` (`better-auth/vue`); tables `auth-schema.ts` re-exported by `server/db/schema.ts` | ^1.7 |
-| Billing | `@polar-sh/better-auth` plugin (checkout + portal) inside `auth.ts`; webhook at `POST /api/auth/polar/webhooks` registered BEFORE `.mount(auth.handler)` with `parse: "none"` | adapter ^2, sdk ^1 |
+| Billing | `@polar-sh/better-auth` plugin (checkout + portal) inside `auth.ts`; webhook at `POST /api/auth/polar/webhooks` registered before `.mount(auth.handler)` with `parse: "none"` | adapter ^2, sdk ^1 |
 | Email | Resend via `server/lib/email.ts` — lazy client + fail-safe (log, never throw): a lost email must not fail the request that triggered it | ^6 |
 | Cache/rate-limit | `server/lib/redis.ts` — lazy ioredis client, `getRedis()` returns null without `REDIS_URL` | ^6 |
 | Observability | `@sentry/nuxt` module; DSN via `runtimeConfig.public.sentry.dsn` (public by design) | ^11 |
@@ -25,33 +25,12 @@ What "the house stack" actually is — distilled from a production codebase and 
 | Testing | Vitest (jsdom, `deps.inline: ["vuetify"]`, excludes `tests/e2e/**`) + Playwright (`tests/e2e`, `webServer` boots `npm run dev`) | ^5, ^1.6x |
 | Lint | ESLint flat + `@stylistic` — double quotes, semicolons, 2-space indent, `@typescript-eslint/no-explicit-any: error`, Vue ruleset in `eslint.config.ts` | eslint ^10 |
 | Hooks | husky — pre-commit `bun run lint:js`, pre-push `<target>/scripts/pre-push-build-validation.sh` (typecheck + unit tests) | ^9 |
-| Deploy | Netlify — nitro `preset: "netlify"`, `netlify.toml` (bun build, `netlify-plugin-cache`, lighthouse plugin), production-only externals inline/external matcher (see nuxt.config comment — Sentry/OTel MUST stay external) | @netlify/nuxt ^1 |
+| Deploy | Netlify — nitro `preset: "netlify"`, `netlify.toml` (bun build, `netlify-plugin-cache`, lighthouse plugin), production-only externals inline/external matcher (see nuxt.config comment — Sentry/OTel must stay external) | @netlify/nuxt ^1 |
 | Docs | VitePress in `docs/` | ^1.6 |
 
 ## Directory map
 
-```
-AGENTS.md             agent instructions — always-on pointer to the style guide
-app.vue  auth.ts  auth-schema.ts  drizzle.config.ts  eslint.config.ts
-netlify.toml  nuxt.config.ts  playwright.config.ts  vitest.config.ts
-assets/styles/      global.scss, settings.scss
-components/         Common/NotificationSnackbar.vue …
-composables/        useTheme.ts …
-constants/          app-wide constants (add as needed)
-interfaces/         all shared types (app, api, elysia, auth, common …)
-layouts/            app.vue (full chrome) | blank.vue (bare) | minimal.vue (bar only)
-lib/                client-side libs (auth-client.ts)
-middleware/         auth.global.ts — session sync + guest/protected redirects
-pages/              index, sign-in, register …
-plugins/            vuetify.ts (createVuetify + theme wiring)
-public/             favicon set, static files
-scripts/            project scripts (pre-push validation …)
-server/             api.ts, errors.ts, <domain>.ts routers, db/, lib/, middleware/
-stores/             Pinia stores — one per domain
-tests/              vitest specs + e2e/
-utils/              logger.ts, error-handlers.ts, email.ts …
-docs/rules/           the code-style-guide set (16 files, passive reference docs)
-```
+Layouts: `app` (full chrome) | `blank` (bare) | `minimal` (bar only). `docs/rules/` carries the 16-file code-style-guide set (passive docs). Everything else is where the template puts it — `ls <target>` for the tree.
 
 ## Invariants — don't break these when adapting
 
@@ -67,17 +46,10 @@ docs/rules/           the code-style-guide set (16 files, passive reference docs
 10. **Types live in `interfaces/`**, server helpers in `server/lib/`, shared utilities in `utils/`. Structured logging via `utils/logger.ts` — never log secrets or credential-bearing payloads.
 11. **neon-http for reads/simple writes; `withDbTx` for multi-write transactions.** No pool, per-invocation pg client — serverless-shaped.
 12. **Secrets in `.env` only; `.env.example` ships var names, never values.** Server-only keys stay out of `runtimeConfig.public`.
-13. **External-service clients construct lazily, never at module load.** `new X(apiKey)` that throws on missing env (the Resend constructor did) 500s every route — pages, API, everything — because the import graph loads it once. Follow `getRedis()`: missing config returns null, callers log and no-op. This is what makes placeholder env a valid dev baseline.
+13. **Missing env degrades per-route, never the process — nothing in the module graph throws at import.** Enforcement points: lazy `db` Proxy (`server/db/index.ts`), `getResend()`/`getRedis()` null-returning clients, `auth.ts` boot warn + gated polar + secret fallback, `polar-webhook.ts` refusal. The answer to missing env is degrade + warn + refuse-dangerous — never fail silently, never kill the process. `tests/env-degradation.spec.ts` gates it.
+14. **Agent scratch dirs (`.cdo-work/`, `.blobs/`) stay ignored at every layer** — top-level `ignore` (Nuxt scanner + watchers), `typescript.tsConfig.exclude`, `vite.server.watch.ignored` (chokidar; `.gitignore` does not stop it), `eslint.config.ts` ignores, `.gitignore`. A worktree's `node_modules` is tens of thousands of files; unprotected watchers heap-exhaust the dev server. The ignores render unconditionally — inert until the dirs exist — so `cdo-setup` never has to patch project config.
+15. **No ref'd handles at module scope.** Top-level `setInterval`/`setTimeout`/sockets/pools must be `.unref()`'d, lazy behind a function, or closed on shutdown — `nuxt-elysia`'s generated plugin eagerly imports the whole API surface on every Nitro boot, and `prerender: true` on any route makes that boot happen *inside* `nuxi build`. A pending handle lets a build print complete then hang the process; the spine ships `swr` routeRules, not prerender.
 
 ## Deliberately excluded from the template (source-domain, not spine)
 
-Domain routers/stores, E2EE crypto (libsodium, wrapped keys), competitor OAuth imports, referral/creator/onboarding systems, email automations (Resend segment sync), analytics extras, release-train versioning, rate-limit subsystem, IndexNow, markdown content twins + llms.txt, `@nuxt/a11y` axe overrides beyond the defaults, `.cdo-work` watcher ignores. Reach for these from the source repo the spine was distilled from if a greenfield project needs them — they're domain modules, not spine.
-
-## Agent tooling modules (installed post-scaffold, not rendered)
-
-Two BMad module families ride alongside the spine but are NOT part of the render — they install into the target's own skills tree afterward via their setup skills:
-
-- **cdo — Autonomous Delivery Org** (`cdo-setup` to install; `cdo-orchestrator`/Marshal to run): batch dispatch, alignment cards, delivery ops. Its `.cdo-work/` worktree dir is why the source project's nuxt.config carried watcher ignores — only port that ignore block if the project will actually run cdo batches.
-- **srm — Skills Repo Manager** (`srm-setup` to install, `srm-sync` to sync): maps external skill repos into the project as prefixed BMad-structured skills.
-
-Mention these in the operator checklist when the user wants agent tooling in the new repo — don't bake them into the template; their setup skills own the install and stay current when the modules update.
+Domain routers/stores, E2EE crypto (libsodium, wrapped keys), competitor OAuth imports, referral/creator/onboarding systems, email automations (Resend segment sync), analytics extras, release-train versioning, rate-limit subsystem, IndexNow, markdown content twins + llms.txt, `@nuxt/a11y` axe overrides beyond the defaults. Reach for these from the source repo the spine was distilled from if a greenfield project needs them — they're domain modules, not spine.

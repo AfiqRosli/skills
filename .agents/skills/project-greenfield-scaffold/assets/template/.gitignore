@@ -29,3 +29,7 @@ docs/.vitepress/cache
 # Test reports and results
 playwright-report/
 test-results/
+
+# Agent scratch dirs (cdo drain worktrees, blob stores)
+.cdo-work/
+.blobs/

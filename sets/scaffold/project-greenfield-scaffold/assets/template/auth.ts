@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 // @flag billing
@@ -11,77 +12,89 @@ import db from "./server/db/index";
 import * as schema from "./server/db/schema";
 import { logger } from "./utils/logger";
 
+// Missing env degrades the routes that need it, never the process —
+// this file is in the transitive import graph of every API route, so a
+// throw at module eval 500s everything. Degraded mode is loud in logs
+// (one boot warning naming every gap) and refuses the dangerous route
+// rather than failing silently: an empty webhook secret or bogus
+// product ID is a security hole, not just an outage.
 // @flag billing
-// Fail fast on missing production secrets — prevents insecure defaults
-// (empty webhook secret would allow forged state_changed events; missing
-// product ID would create checkouts against a non-existent product).
-const isProduction = process.env.NODE_ENV === "production";
 const polarAccessToken = process.env.POLAR_ACCESS_TOKEN;
-const polarWebhookSecret = process.env.POLAR_WEBHOOK_SECRET ?? "";
-const polarProductIdMonthly = process.env.NUXT_POLAR_PRODUCT_ID_MONTHLY ?? "";
+const polarWebhookSecret = process.env.POLAR_WEBHOOK_SECRET;
+const polarProductIdMonthly = process.env.NUXT_POLAR_PRODUCT_ID_MONTHLY;
 
-if (isProduction) {
-  if (!polarAccessToken) {
-    throw new Error(
-      "POLAR_ACCESS_TOKEN is required in production — without it every "
-      + "Polar SDK call fails authentication (checkouts, customer sync).",
-    );
-  }
-  if (!polarWebhookSecret) {
-    throw new Error(
-      "POLAR_WEBHOOK_SECRET is required in production — without it, "
-      + "webhook signature verification is disabled and forged events "
-      + "could grant unauthorized access.",
-    );
-  }
-  if (!polarProductIdMonthly) {
-    throw new Error(
-      "NUXT_POLAR_PRODUCT_ID_MONTHLY is required in production.",
-    );
-  }
-}
-else if (!polarWebhookSecret || !polarProductIdMonthly) {
-  logger.warn("Polar configuration incomplete — using dev fallbacks", {
-    missingWebhookSecret: !polarWebhookSecret,
-    missingProductIdMonthly: !polarProductIdMonthly,
+// polarClient builds only when checkout can actually succeed — no SDK
+// instance holding an empty access token.
+export const polarClient =
+  polarAccessToken && polarProductIdMonthly
+    ? createPolarCore({
+        accessToken: polarAccessToken,
+        environment:
+          (process.env.POLAR_SERVER as "sandbox" | "production") || "sandbox",
+      })
+    : null;
+// @endflag billing
+
+const missingAuthEnv = [
+  !process.env.BETTER_AUTH_SECRET &&
+    "BETTER_AUTH_SECRET (ephemeral per-boot secret in use — sessions die on restart)",
+  // @flag billing
+  !polarAccessToken && "POLAR_ACCESS_TOKEN",
+  !polarWebhookSecret && "POLAR_WEBHOOK_SECRET",
+  !polarProductIdMonthly && "NUXT_POLAR_PRODUCT_ID_MONTHLY",
+  // @endflag billing
+].filter(Boolean);
+if (missingAuthEnv.length) {
+  logger.warn("auth env incomplete — running degraded", {
+    missing: missingAuthEnv,
   });
 }
 
-export const polarClient = createPolarCore({
-  accessToken: polarAccessToken!,
-  environment:
-    (process.env.POLAR_SERVER as "sandbox" | "production") || "sandbox",
-});
+// Falls back through host-provided env (Netlify sets DEPLOY_PRIME_URL)
+// so auth stays mounted without explicit config.
+const baseURL =
+  process.env.BETTER_AUTH_URL ??
+  process.env.NUXT_PUBLIC_APP_URL ??
+  process.env.DEPLOY_PRIME_URL ??
+  "http://localhost:3000";
 
-// @endflag billing
 export const auth = betterAuth({
   appName: "{{PROJECT_NAME}}",
-  baseURL: process.env.BETTER_AUTH_URL!,
+  baseURL,
+  // better-auth throws inside its request handler when secret is unset
+  // — and .mount(auth.handler) fans that out to every route. An
+  // ephemeral per-boot secret keeps auth mounted; the boot warning
+  // above names the gap (sessions do not survive a restart).
+  secret: process.env.BETTER_AUTH_SECRET ?? randomBytes(32).toString("hex"),
   trustedOrigins: [
-    process.env.BETTER_AUTH_URL!,
+    baseURL,
     ...(process.env.NODE_ENV === "development"
       ? ["http://localhost:3000", "http://127.0.0.1:*"]
       : ["{{SITE_URL}}"]),
   ],
   plugins: [
     // @flag billing
-    polar({
-      client: polarClient,
-      createCustomerOnSignUp: true,
-      use: [
-        checkout({
-          products: [
-            {
-              productId: polarProductIdMonthly,
-              slug: "monthly",
-            },
-          ],
-          successUrl: "/thank-you?checkout_id={CHECKOUT_ID}",
-          authenticatedUsersOnly: true,
-        }),
-        portal(),
-      ],
-    }),
+    ...(polarClient
+      ? [
+          polar({
+            client: polarClient,
+            createCustomerOnSignUp: true,
+            use: [
+              checkout({
+                products: [
+                  {
+                    productId: polarProductIdMonthly!,
+                    slug: "monthly",
+                  },
+                ],
+                successUrl: "/thank-you?checkout_id={CHECKOUT_ID}",
+                authenticatedUsersOnly: true,
+              }),
+              portal(),
+            ],
+          }),
+        ]
+      : []),
     // @endflag billing
   ],
   database: drizzleAdapter(db, {

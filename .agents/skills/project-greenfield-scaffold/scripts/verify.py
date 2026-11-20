@@ -54,24 +54,44 @@ CHECKS = ["type-check", "lint", "test:run", "build"]
 # (they legitimately 500 on the shipped placeholder DATABASE_URL).
 DEV_PROBES = ["/", "/api/hello"]
 
+# Module → what only a human can finish, emitted when the scaffold state
+# names enabled modules (mirrors references/verify.md's checklist).
+MODULE_SETUP = {
+    "db": "a real DATABASE_URL",
+    "auth": "BETTER_AUTH_SECRET + OAuth keys",
+    "billing": "Polar product IDs",
+    "email": "RESEND_API_KEY",
+    "sentry": "SENTRY_DSN",
+    "redis": "REDIS_URL",
+    "tests": "bunx playwright install (required before test:e2e)",
+}
 
-def run_check(target: Path, script: str, runner: str, tail_lines: int, verbose: bool) -> dict:
+
+def run_check(target: Path, script: str, runner: str, tail_lines: int, verbose: bool, timeout_s: int) -> dict:
     cmd = [runner, "run", script]
     started = time.monotonic()
     if verbose:
         print(f"  $ {' '.join(cmd)}", file=sys.stderr)
-    proc = subprocess.run(
+    proc = subprocess.Popen(
         cmd,
         cwd=target,
-        capture_output=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
         text=True,
         encoding="utf-8",
         errors="replace",
+        start_new_session=os.name != "nt",
     )
+    timed_out = False
+    try:
+        combined, _ = proc.communicate(timeout=timeout_s)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        kill_tree(proc)
+        combined, _ = proc.communicate()
     duration = round(time.monotonic() - started, 1)
-    combined = (proc.stdout or "") + (proc.stderr or "")
-    tail = combined.strip().splitlines()[-tail_lines:] if proc.returncode != 0 else []
-    return {
+    tail = (combined or "").strip().splitlines()[-tail_lines:] if proc.returncode != 0 else []
+    result = {
         "check": script,
         "command": " ".join(cmd),
         "status": "pass" if proc.returncode == 0 else "fail",
@@ -79,6 +99,16 @@ def run_check(target: Path, script: str, runner: str, tail_lines: int, verbose: 
         "duration_s": duration,
         "output_tail": tail,
     }
+    if timed_out:
+        # A completion marker in the tail means a hung process exit
+        # (leaked handle), not a slow build — different fix.
+        result["timed_out"] = True
+        result["note"] = (
+            "exceeded --check-timeout — if output_tail shows a completion "
+            "marker the build finished but never exited (leaked handle), "
+            "it is not a slow build"
+        )
+    return result
 
 
 def free_port() -> int:
@@ -190,7 +220,8 @@ def main() -> int:
     parser.add_argument("--runner", choices=["bun", "npm"], help="Package runner (default: bun if on PATH, else npm)")
     parser.add_argument("--stop-on-fail", action="store_true", help="Halt at first failed check")
     parser.add_argument("--no-dev", action="store_true", help="Skip the dev-boot runtime probe")
-    parser.add_argument("--dev-timeout", type=int, default=240, help="Seconds to wait for the dev server per probe (default 240)")
+    parser.add_argument("--check-timeout", type=int, default=1200, help="Seconds before a check is killed (default 1200) — a hung process exit fails loudly instead of stalling the gate")
+    parser.add_argument("--dev-timeout", type=int, default=240, help="Total dev-server boot budget shared across all probes (default 240)")
     parser.add_argument("-o", "--output", help="Write JSON report to file instead of stdout")
     parser.add_argument("--verbose", action="store_true", help="Progress to stderr")
     args = parser.parse_args()
@@ -214,13 +245,22 @@ def main() -> int:
 
     runner = args.runner or ("bun" if shutil.which("bun") else "npm")
 
+    # Rendered module set, when the scaffold state artifact names it —
+    # drives the operator_checklist on the report.
+    enabled_modules: list[str] = []
+    state_file = target / ".scaffold-report.json"
+    try:
+        enabled_modules = json.loads(state_file.read_text(encoding="utf-8")).get("modules", {}).get("enabled", [])
+    except (OSError, json.JSONDecodeError):
+        pass  # no state artifact — checklist just stays empty
+
     results = []
     status = "pass"
     for check in checks:
         if check not in scripts:
             results.append({"check": check, "status": "skipped", "reason": "not in package.json scripts"})
             continue
-        r = run_check(target, check, runner, args.tail, args.verbose)
+        r = run_check(target, check, runner, args.tail, args.verbose, args.check_timeout)
         results.append(r)
         if r["status"] == "fail":
             status = "fail"
@@ -242,6 +282,9 @@ def main() -> int:
         "target": str(target),
         "runner": runner,
         "checks": results,
+        "operator_checklist": [
+            MODULE_SETUP[m] for m in enabled_modules if m in MODULE_SETUP
+        ],
         "summary": {
             "total": len(results),
             "passed": sum(1 for r in results if r.get("status") == "pass"),
@@ -252,7 +295,6 @@ def main() -> int:
 
     # Persist into the scaffold state artifact so --status (and a resumed
     # session) can see the verify leg already ran.
-    state_file = target / ".scaffold-report.json"
     if state_file.exists():
         try:
             state = json.loads(state_file.read_text(encoding="utf-8"))

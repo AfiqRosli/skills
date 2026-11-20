@@ -116,6 +116,142 @@ class TestScaffold(unittest.TestCase):
             self.assertTrue(status["key_files"]["package.json"])
             self.assertFalse(status["key_files"]["node_modules"])
 
+    def test_record_merges_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "proj"
+            run_scaffold(target)
+            run_scaffold(target, "--record", '{"adaptations": ["shimmed nuxt-elysia"]}')
+            run_scaffold(target, "--record",
+                         '{"adaptations": ["bumped vitest major"], "run_status": "blocked", "reason": "no compatible release"}')
+            state = json.loads((target / ".scaffold-report.json").read_text())
+            self.assertEqual(state["adaptations"],
+                             ["shimmed nuxt-elysia", "bumped vitest major"])
+            self.assertEqual(state["run_status"], "blocked")
+            self.assertEqual(state["reason"], "no compatible release")
+            self.assertEqual(state["script"], "scaffold")  # original report preserved
+
+    def test_render_preserves_recorded_state(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "proj"
+            # record before render — --record must create the target
+            result = run_scaffold(target, "--record",
+                                  '{"assumptions": ["name defaulted to dir"]}')
+            self.assertEqual(result["status"], "pass")
+            state = json.loads((target / ".scaffold-report.json").read_text())
+            self.assertEqual(state["assumptions"], ["name defaulted to dir"])
+
+            # render over the recorded state — assumptions must survive
+            target2 = Path(td) / "proj2"
+            run_scaffold(target2)
+            run_scaffold(target2, "--record",
+                         '{"adaptations": ["shimmed x"], "verify": {"status": "pass"}, "run_status": "complete"}')
+            run_scaffold(target2, "--force")
+            state = json.loads((target2 / ".scaffold-report.json").read_text())
+            self.assertEqual(state["adaptations"], ["shimmed x"])
+            self.assertEqual(state["verify"], {"status": "pass"})
+            self.assertEqual(state["run_status"], "complete")
+            self.assertIsInstance(state["result"]["files_written"], list)
+
+    def test_record_warns_unknown_keys(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "proj"
+            run_scaffold(target)
+            result = run_scaffold(target, "--record",
+                                  '{"assumptions": ["a"], "runstatus": "blocked"}')
+            self.assertEqual(result["status"], "pass")
+            self.assertTrue(any("runstatus" in w for w in result["warnings"]))
+
+    def test_record_verify_is_a_known_key(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "proj"
+            run_scaffold(target)
+            result = run_scaffold(target, "--record",
+                                  '{"verify": {"status": "pass"}}')
+            self.assertFalse(any("verify" in w for w in result.get("warnings", [])))
+            state = json.loads((target / ".scaffold-report.json").read_text())
+            self.assertEqual(state["verify"]["status"], "pass")
+
+    def test_record_pasted_report_self_filters(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "proj"
+            run_scaffold(target)
+            # a full pasted report drops its render keys and keeps only
+            # the classifier-read ones — no hand-extraction needed
+            run_scaffold(target, "--record",
+                         '{"script": "scaffold", "timestamp": "2020-01-01",'
+                         ' "result": {"files_written": ["bogus"]},'
+                         ' "verify": {"status": "pass"}, "run_status": "complete"}')
+            state = json.loads((target / ".scaffold-report.json").read_text())
+            self.assertEqual(state["verify"]["status"], "pass")
+            self.assertEqual(state["run_status"], "complete")
+            self.assertIsInstance(state["result"]["files_written"], list)
+            self.assertNotEqual(state["result"]["files_written"], ["bogus"])
+
+    def test_stale_verify_after_rerender(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "proj"
+            run_scaffold(target)
+            run_scaffold(target, "--record",
+                         '{"verify": {"status": "pass", "timestamp": "2020-01-01T00:00:00+00:00"}}')
+            run_scaffold(target, "--force")
+            status = run_scaffold(target, "--status")
+            self.assertEqual(status["resume_hint"],
+                             "verify passed before last re-render — re-run verify")
+
+    def test_status_prior_report_is_compact(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "proj"
+            run_scaffold(target)
+            status = run_scaffold(target, "--status")
+            result = status["prior_report"]["result"]
+            self.assertIsInstance(result["files_written"], int)
+            self.assertIsInstance(result["files_excluded"], int)
+
+    def test_resume_hint_run_status_complete(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "proj"
+            run_scaffold(target)
+            run_scaffold(target, "--record", '{"run_status": "complete"}')
+            status = run_scaffold(target, "--status")
+            self.assertEqual(status["resume_hint"], "run complete — done")
+
+    def test_resume_hint_prefers_persisted_outcome(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "proj"
+            run_scaffold(target)
+            state_file = target / ".scaffold-report.json"
+            state = json.loads(state_file.read_text())
+            state["verify"] = {"status": "pass"}
+            state_file.write_text(json.dumps(state))
+            # node_modules absent — the file-state ladder alone would say
+            # "scaffold rendered"; the persisted verify outcome must win
+            status = run_scaffold(target, "--status")
+            self.assertEqual(status["resume_hint"], "verify passed — done")
+
+    def test_init_env_secret_honesty(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "proj"
+            run_scaffold(target)
+            result = run_scaffold(target, "--init-env")
+            self.assertTrue(result["secret_generated"])
+            self.assertNotIn("generate-a-long-random-string",
+                             (target / ".env").read_text())
+
+    def test_init_env_no_secret_when_auth_off(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "proj"
+            run_scaffold(target, "--skip", "db")  # cascades auth off
+            result = run_scaffold(target, "--init-env")
+            self.assertEqual(result["status"], "pass")
+            self.assertFalse(result["secret_generated"])
+            self.assertNotIn("BETTER_AUTH_SECRET", (target / ".env").read_text())
+
+    def test_check_drift_requires_package_json(self):
+        with tempfile.TemporaryDirectory() as td:
+            target = Path(td) / "proj"
+            result = run_scaffold(target, "--check-drift")
+            self.assertEqual(result["status"], "fail")
+
     def test_skip_rules(self):
         with tempfile.TemporaryDirectory() as td:
             target = Path(td) / "proj"

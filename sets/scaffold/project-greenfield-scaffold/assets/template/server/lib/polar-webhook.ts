@@ -7,11 +7,20 @@ import { logger } from "@/utils/logger";
  *
  * Signature verification happens inside @polar-sh/better-auth's
  * webhooks() handler once wired; this stub preserves the routing
- * contract and shows where subscription lifecycle events land.
- * POLAR_WEBHOOK_SECRET must be set in production (auth.ts fails fast
- * when it is not).
+ * contract and shows where subscription lifecycle events land. While
+ * POLAR_WEBHOOK_SECRET is unset the route refuses 503 — accepting
+ * unsigned state_changed events is a security hole, not an outage.
+ * auth.ts lists the gap in its boot warning.
  */
 export async function handlePolarWebhook({ request }: { request: Request }) {
+  if (!process.env.POLAR_WEBHOOK_SECRET) {
+    logger.warn("Polar webhook rejected — POLAR_WEBHOOK_SECRET unset");
+    return new Response(JSON.stringify({ error: "Webhook not configured" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   const rawBody = await request.text();
   const signature = request.headers.get("webhook-signature");
 

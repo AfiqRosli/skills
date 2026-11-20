@@ -39,12 +39,21 @@ const SECURITY_HEADERS = {
 } as const;
 
 // CORS configuration — add preview/admin origins as the project grows.
-// The dev server's bound origin must appear here or CSRF validation 403s
-// browser POSTs — if nuxt dev binds a non-3000 port, add that origin.
-const CORS_ORIGINS = [
+// nuxt dev binds whatever port is free (3000 taken → 3001…); loopback
+// origins are accepted in development so CSRF/CORS don't 403 the app on
+// its own dev server. Production stays pinned to the explicit list.
+const DEV_LOOPBACK_ORIGIN = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/;
+
+const CORS_ORIGINS: (string | RegExp)[] = [
   "{{SITE_URL}}",
-  ...(process.env.NODE_ENV === "development" ? ["http://localhost:3000"] : []),
+  ...(process.env.NODE_ENV === "development" ? [DEV_LOOPBACK_ORIGIN] : []),
 ];
+
+function isAllowedOrigin(origin: string): boolean {
+  return CORS_ORIGINS.some(allowed =>
+    typeof allowed === "string" ? allowed === origin : allowed.test(origin),
+  );
+}
 
 /**
  * Apply security headers to response
@@ -118,7 +127,7 @@ export function validateOrigin(request: Request, set: SecurityHeaders): boolean 
     return false;
   }
 
-  if (!CORS_ORIGINS.includes(origin)) {
+  if (!isAllowedOrigin(origin)) {
     logger.warn("CSRF: Origin not allowed", {
       method: request.method,
       origin,

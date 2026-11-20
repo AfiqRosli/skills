@@ -50,6 +50,25 @@ FLAG_OPEN = re.compile(r"@flag\s+([A-Za-z0-9_-]+)")
 FLAG_CLOSE = re.compile(r"@endflag\s+([A-Za-z0-9_-]+)")
 TOKEN = re.compile(r"\{\{(PROJECT_NAME|PROJECT_SLUG|SITE_URL)\}\}")
 
+# Keys the classifiers read. Caller-authored keys (RECORD_KEYS) are the
+# audit trail; `verify` is normally verify.py-written but is a legal
+# record too (a pasted report carries it). All five survive a re-render;
+# --record warns on anything outside PRESERVED_KEYS — a typo'd key is
+# dead state the classifier never reads.
+RECORD_KEYS = ("assumptions", "adaptations", "run_status", "reason")
+PRESERVED_KEYS = RECORD_KEYS + ("verify",)
+
+
+def merge_state(base: dict, patch: dict) -> dict:
+    """--record merge semantics: list + list appends; anything else sets."""
+    for key, value in patch.items():
+        existing = base.get(key)
+        if isinstance(value, list) and isinstance(existing, list):
+            existing.extend(value)
+        else:
+            base[key] = value
+    return base
+
 
 def log(msg: str, verbose: bool) -> None:
     if verbose:
@@ -252,6 +271,9 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="Compute the plan without writing files")
     parser.add_argument("--status", action="store_true", help="Report existing scaffold state in TARGET (.scaffold-report.json + key files) and exit")
     parser.add_argument("--init-env", action="store_true", help="Create TARGET/.env from .env.example (if absent) with a generated BETTER_AUTH_SECRET, then exit")
+    parser.add_argument("--record", metavar="JSON", help="Merge a JSON object into TARGET/.scaffold-report.json — list values append, scalars set (adaptations, assumptions, run_status, reason)")
+    parser.add_argument("--check-drift", action="store_true", help="Compare TARGET package.json dep pins against npm latest majors; emits drifted/skipped/errors JSON (uses network)")
+    parser.add_argument("--registry", default="https://registry.npmjs.org", help="npm registry base URL for --check-drift (default: https://registry.npmjs.org; set for a private mirror)")
     parser.add_argument("-o", "--output", help="Write JSON report to file instead of stdout")
     parser.add_argument("--verbose", action="store_true", help="Diagnostics to stderr")
     args = parser.parse_args()
@@ -279,22 +301,60 @@ def main() -> int:
                       "node_modules", ".env", ".git", ".nuxt")
         }
         verify_status = (prior or {}).get("verify", {}).get("status")
+        run_status = (prior or {}).get("run_status")
+        # A verify older than the report's own render timestamp predates
+        # the latest render — preserved on write, but stale: the files it
+        # passed over were rewritten.
+        verify_ts = (prior or {}).get("verify", {}).get("timestamp")
+        render_ts = (prior or {}).get("timestamp")
+        verify_stale = bool(
+            verify_status in ("pass", "fail")
+            and verify_ts and render_ts and verify_ts < render_ts
+        )
+        # Compact prior_report — resume needs status fields, not the
+        # ~100-path file lists and verify output tails; the full artifact
+        # stays on disk for anyone who needs it.
+        if isinstance(prior, dict):
+            result_summary = {
+                k: (len(v) if isinstance(v, list) else v)
+                for k, v in (prior.get("result") or {}).items()
+            }
+            prior_report = {
+                k: v for k, v in prior.items() if k != "result"
+            }
+            if result_summary:
+                prior_report["result"] = result_summary
+            verify = prior_report.get("verify")
+            if isinstance(verify, dict):
+                prior_report["verify"] = {
+                    k: ([{**c, "output_tail": c["output_tail"][-1600:]}
+                         if isinstance(c, dict) and isinstance(c.get("output_tail"), str)
+                         else c for c in v] if isinstance(v, list) else v)
+                    for k, v in verify.items()
+                }
+        else:
+            prior_report = prior
         _emit({
             "script": "scaffold",
             "version": "1.0.0",
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "status": "pass" if prior else "warning",
             "target": str(target),
-            "prior_report": prior,
+            "prior_report": prior_report,
             "key_files": key_files,
             "verify_status": verify_status,
+            "run_status": run_status,
             "resume_hint": (
-                "scaffold rendered" if (target / "package.json").exists()
-                and not (target / "node_modules").exists()
-                else "run full scaffold" if not (target / "package.json").exists()
+                "blocked — see prior_report.reason" if run_status == "blocked"
+                else "run complete — done" if run_status == "complete"
+                else f"verify {verify_status}ed before last re-render — re-run verify"
+                if verify_stale
                 else "verify passed — done" if verify_status == "pass"
                 else "verify failed — inspect .scaffold-report.json"
                 if verify_status == "fail"
+                else "scaffold rendered" if (target / "package.json").exists()
+                and not (target / "node_modules").exists()
+                else "run full scaffold" if not (target / "package.json").exists()
                 else "scaffold + install done — verify next"
             ),
         }, args.output)
@@ -310,13 +370,96 @@ def main() -> int:
             result.update(status="fail", reason="no .env.example in target")
         else:
             import secrets
-            content = example.read_text(encoding="utf-8").replace(
-                "generate-a-long-random-string", secrets.token_hex(32)
+            example_text = example.read_text(encoding="utf-8")
+            secret_generated = "generate-a-long-random-string" in example_text
+            env_file.write_text(
+                example_text.replace("generate-a-long-random-string", secrets.token_hex(32)),
+                encoding="utf-8",
             )
-            env_file.write_text(content, encoding="utf-8")
-            result.update(status="pass", reason=".env created with generated BETTER_AUTH_SECRET")
+            result.update(
+                status="pass",
+                secret_generated=secret_generated,
+                reason=".env created with generated BETTER_AUTH_SECRET" if secret_generated
+                else ".env created — no BETTER_AUTH_SECRET placeholder (auth module off)",
+            )
         _emit(result, args.output)
         return 0 if result["status"] != "fail" else 1
+
+    if args.record is not None:
+        try:
+            patch = json.loads(args.record)
+        except json.JSONDecodeError as e:
+            print(f"error: --record is not valid JSON: {e}", file=sys.stderr)
+            return 2
+        if not isinstance(patch, dict):
+            print("error: --record expects a JSON object", file=sys.stderr)
+            return 2
+        # A pasted full report self-filters to the keys classifiers read
+        # (verify/run_status/reason) — no hand-extraction needed.
+        if "script" in patch or "result" in patch:
+            patch = {k: v for k, v in patch.items() if k in PRESERVED_KEYS}
+        state_file = target / ".scaffold-report.json"
+        report_patch: dict = {}
+        if state_file.exists():
+            try:
+                report_patch = json.loads(state_file.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                print("error: .scaffold-report.json is unparseable — fix or remove it", file=sys.stderr)
+                return 2
+        merge_state(report_patch, patch)
+        unknown = sorted(set(patch) - set(PRESERVED_KEYS))
+        try:
+            state_file.parent.mkdir(parents=True, exist_ok=True)
+            tmp = state_file.with_name(state_file.name + ".tmp")
+            tmp.write_text(json.dumps(report_patch, indent=2), encoding="utf-8")
+            tmp.replace(state_file)
+        except OSError as e:
+            print(f"error: could not write .scaffold-report.json: {e}", file=sys.stderr)
+            return 2
+        result = {
+            "script": "scaffold", "action": "record", "status": "pass",
+            "target": str(target), "report": str(state_file), "recorded": patch,
+        }
+        if unknown:
+            result["warnings"] = [
+                f"unknown record key(s) ignored by classifiers: {', '.join(unknown)}"
+            ]
+        _emit(result, args.output)
+        return 0
+
+    if args.check_drift:
+        result = {
+            "script": "scaffold", "action": "check-drift", "target": str(target),
+            "drifted": [], "skipped": [], "errors": [],
+        }
+        pkg_file = target / "package.json"
+        if not pkg_file.exists():
+            result.update(status="fail", reason="no package.json in target — render first")
+            _emit(result, args.output)
+            return 1
+        import urllib.request
+        from urllib.parse import quote
+        registry = args.registry.rstrip("/")
+        pkg = json.loads(pkg_file.read_text(encoding="utf-8"))
+        deps = {**pkg.get("dependencies", {}), **pkg.get("devDependencies", {})}
+        for dep, pinned in sorted(deps.items()):
+            pinned_major = re.match(r"^[\^~>=\s]*v?(\d+)", pinned)
+            if not pinned_major:
+                result["skipped"].append({"dep": dep, "pinned": pinned})
+                continue
+            try:
+                url = f"{registry}/{quote(dep, safe='@')}/latest"
+                with urllib.request.urlopen(url, timeout=5) as resp:
+                    latest = json.loads(resp.read())["version"]
+            except (OSError, json.JSONDecodeError, KeyError) as e:
+                result["errors"].append({"dep": dep, "error": str(e)})
+                continue
+            latest_major = re.match(r"(\d+)", latest)
+            if latest_major and int(latest_major.group(1)) > int(pinned_major.group(1)):
+                result["drifted"].append({"dep": dep, "pinned": pinned, "latest": latest})
+        result["status"] = "warning" if result["errors"] else "pass"
+        _emit(result, args.output)
+        return 0
 
     name = args.name or target.name.replace("-", " ").replace("_", " ").title()
 
@@ -366,10 +509,22 @@ def main() -> int:
 
     # State artifact — lets a later session/pipeline resume from state
     # (--status reads it back; verify appends its results alongside).
+    # Merge, don't overwrite: operator-recorded keys (assumptions,
+    # adaptations, run_status, reason, verify) survive a --force
+    # re-render — that trail is the point of the artifact.
+    state_file = target / ".scaffold-report.json"
+    if state_file.exists():
+        try:
+            prior = json.loads(state_file.read_text(encoding="utf-8"))
+            for key in PRESERVED_KEYS:
+                if key in prior:
+                    report[key] = prior[key]
+        except json.JSONDecodeError:
+            report["warnings"].append(
+                "existing .scaffold-report.json was unparseable — replaced"
+            )
     try:
-        (target / ".scaffold-report.json").write_text(
-            json.dumps(report, indent=2), encoding="utf-8"
-        )
+        state_file.write_text(json.dumps(report, indent=2), encoding="utf-8")
     except OSError as e:
         print(f"warning: could not write .scaffold-report.json: {e}", file=sys.stderr)
 

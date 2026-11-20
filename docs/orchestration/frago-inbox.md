@@ -24,3 +24,10 @@ preview lane, gated push) in README.md; small doc fix, run inline
 "upgrade project version" — work request; intaked to version-upgrade
 backlog as `version-upgrade-01`, unaligned — awaits the alignment leg
 → processed 2026-11-18 14:15 — routed, queued `[ ]`
+
+### 2026-11-20 16:15
+"update sets and repo versions" — reinstall cdo/srm/scaffold sets into
+.agents/skills from sets/, refresh skills-manifest versions, bump repo
+version + tag for the scaffold rework
+→ processed 2026-11-20 16:15 — sets synced (scaffold pruned of stale 01-04 refs),
+manifest @0.6.0, release v0.6.0 committed + tagged

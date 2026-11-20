@@ -2,11 +2,11 @@
 
 Modules default ON. `--skip <module>` disables one (repeatable); `--minimal` keeps only `core` + `rules` + `tests`. Disabling a module's requirement cascades: `auth` requires `db`; `billing` requires `auth`. Cascades are reported as `auto_disabled` in the scaffold report.
 
-Three removal mechanisms work together — `scaffold.py` applies all of them:
+`scaffold.py` applies three removal mechanisms:
 
-1. **Excluded paths** — files/dirs deleted from the render (flags.json `excluded_paths`)
-2. **Flag blocks** — `// @flag <mod>` … `// @endflag <mod>` regions stripped in place (also `/* */`, `#`, `<!-- -->` comment forms)
-3. **Stripped deps + scripts** — `flag_stripped_deps` in `versions.json` removes package.json deps; `excluded_scripts` removes npm scripts
+- **Excluded paths** — files/dirs deleted from the render (flags.json `excluded_paths`)
+- **Flag blocks** — `// @flag <mod>` … `// @endflag <mod>` regions stripped in place (also `/* */`, `#`, `<!-- -->` comment forms)
+- **Stripped deps + scripts** — `flag_stripped_deps` in `versions.json` removes package.json deps; `excluded_scripts` removes npm scripts
 
 ## The modules
 
@@ -25,7 +25,7 @@ Three removal mechanisms work together — `scaffold.py` applies all of them:
 | `docs` | `docs/` VitePress site, docs:* scripts, vitepress dep | no docs site |
 | `deploy` | `netlify.toml`, nitro netlify preset + externals matcher, netlify deps | different host |
 
-`--skip db` alone auto-disables `auth` and `billing` (cascade) — listed in the report's `auto_disabled` so the user sees the implication rather than discovering it at build time.
+Candidate, not yet a module: **Better Auth infra** (`dash` control plane + `sentinel` abuse protection, `@better-auth/infra`). If the user asks for admin/audit or abuse protection on a scaffolded project, `references/auth-infra.md` carries the full porting spec — plugin pairing (server `sentinel()` is broken without client `sentinelClient()`), the three blocking layers `withAdminBypass` must cover, the env contract (`SENTINEL_ENABLED`, `BETTER_AUTH_API_KEY`, `NUXT_ADMIN_EMAILS`), and the verify-stage check.
 
 ## Outside the flag system
 

@@ -46,9 +46,13 @@ confidence — what the machine knows it's unsure about goes first.
      Format: - [ ] {key} — push to origin/{lane} | lane {sha8} | marked {date}
      confirm/granted = push it · reject/blocked = stays local -->
 
+- [x] platform-02 — push v0.6.0 to origin/preview | lane 8819841 | marked 2026-11-20 → granted 2026-11-20 — Operator: push preview merge it to main
+
 ## Deploy Sign-offs
 
 - [x] platform-01 — publish v0.3.0: merge preview → main, push origin main + tag v0.3.0 | lane ccef75d | marked 2026-11-17 → granted 2026-11-17 — Operator: push v0.3.0 — merge preview to main, push main + tag
+      confirm/granted = push it · reject/blocked = stays local
+- [x] platform-02 — publish v0.6.0: merge preview → main, push origin main + tag v0.6.0 | lane 8819841 | marked 2026-11-20 → granted 2026-11-20 — Operator: push preview merge it to main
       confirm/granted = push it · reject/blocked = stays local
 
 ## Requisitions (env vars, credentials, accounts)

@@ -1,0 +1,52 @@
+departments:
+  cdo-platform:
+    dept: cdo-platform
+    label: Platform & Release Engineering
+    backlog: platform
+    capabilities:
+      ship:
+        entry: cdo-platform
+        consumes: verified story (ledger status verified)
+        produces: "landed outcome \u2192 ledger + ship journal entry (lane_sha)"
+        delegates-when-installed:
+        - wdl-release-it
+        - wdl-improve-app
+      push:
+        entry: cdo-platform
+        consumes: Operator-signed Pre-deploy Sign-offs (pre_deploy.signed_at)
+        produces: origin/{lane} publish + stories.{key}.pushed stamps
+      env-check:
+        entry: cdo-platform
+        consumes: .env + card externals + requisitions
+        produces: coverage report JSON (env-scan.py)
+      rollback:
+        entry: cdo-platform
+        consumes: shipped story key + target
+        produces: revert commit + rollback journal
+        delegates-when-installed:
+        - wdl-release-it
+      version-upgrade:
+        entry: cdo-platform
+        consumes: Operator sprint-start directive + release-train.json + sprint artifacts
+        produces: migrated sprint-status-*.yaml + epics-beta-*.md + spec folder
+        delegates-when-installed:
+        - cdo-version-upgrade
+      produce:
+        entry: cdo-platform
+        consumes: confirmed platform item card
+        produces: executed platform work + outcome journaled to ledger
+      consult:
+        entry: cdo-platform
+        consumes: "open question or topic \u2014 no backlog item required"
+        produces: advice + dated consult note in {orchestration_dir}/consult/platform.md
+        delegates-when-installed:
+        - wdl-release-it
+        - wdl-improve-app
+        - netlify
+    delegates_probe:
+      available:
+      - bmad-testarch-framework
+      missing:
+      - netlify
+      - wdl-release-it
+      - wdl-improve-app

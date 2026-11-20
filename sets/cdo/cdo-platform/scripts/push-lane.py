@@ -134,7 +134,8 @@ def story_views(ledger: dict) -> list:
         if not isinstance(st, dict):
             continue
         pd = st.get("pre_deploy") or {}
-        pushed = st.get("pushed") or {}
+        pv = st.get("pushed") or {}
+        pushed = pv if isinstance(pv, dict) else {"at": pv}
         out.append({
             "key": key,
             "status": st.get("status"),

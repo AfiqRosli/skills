@@ -8,14 +8,14 @@ archeology required.
 
 - batch: none
 - in-flight story: none
-- last completed step: v0.6.0 release cut on preview — sets reinstalled, scaffold rework committed
-- timestamp: 2026-11-20 16:20 local
+- last completed step: platform-02 published — v0.6.0 live on origin/main + origin/preview @ e8869fa, tag v0.6.0 pushed
+- timestamp: 2026-11-20 16:25 local
 
 ## Batch State Snapshot
 
-- preview @ 95edcd8 (release: v0.6.0) — NOT pushed; tag v0.6.0 local-only
-- v0.6.0 contents: scaffold env-degradation + build-hang hardening, --record/--status/--check-drift seams, auth-infra + build-hangs refs, stale 01-04 refs pruned, all three sets reinstalled (manifest @0.6.0), README pins bumped
-- push pending: `git push --follow-tags` when Operator green-lights
+- preview == main == origin @ e8869fa; tag v0.6.0 @ 95edcd8 live
+- platform-02: shipped + pushed — terminal; sign-offs filed+granted in checklist
+- shipped in the tail commit: push-lane.py fix (legacy pushed-as-string crash on platform-01) + cdo-platform capabilities.yaml registration (was unregistered)
 
 ## Open Escalations
 

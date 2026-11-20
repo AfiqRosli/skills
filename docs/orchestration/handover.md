@@ -8,14 +8,14 @@ archeology required.
 
 - batch: none
 - in-flight story: none
-- last completed step: platform-01 published — origin/main 1320753, v0.3.0 tag live
-- timestamp: 2026-11-17 19:12 local
+- last completed step: v0.6.0 release cut on preview — sets reinstalled, scaffold rework committed
+- timestamp: 2026-11-20 16:20 local
 
 ## Batch State Snapshot
 
-- preview == main == origin/main @ 1320753; tag v0.3.0 @ ccef75d pushed
-- stories.platform-01: shipped + pushed — complete, terminal
-- untracked on disk: `sets/cdo/cdo-align/.analysis/` — intentionally not committed
+- preview @ 95edcd8 (release: v0.6.0) — NOT pushed; tag v0.6.0 local-only
+- v0.6.0 contents: scaffold env-degradation + build-hang hardening, --record/--status/--check-drift seams, auth-infra + build-hangs refs, stale 01-04 refs pruned, all three sets reinstalled (manifest @0.6.0), README pins bumped
+- push pending: `git push --follow-tags` when Operator green-lights
 
 ## Open Escalations
 
